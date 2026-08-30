@@ -1,0 +1,23 @@
+.next/
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+.env.*.local
+.data/
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+tsconfig.tsbuildinfo
+
+# Staged copy of dist/catalog.json (npm run catalog:stage) — generated, not source.
+public/catalog.json
+
+# Local screenshot scratch (QA captures, not release evidence)
+.shots/
+
+# Python (skill scanner cache)
+__pycache__/
+*.pyc
