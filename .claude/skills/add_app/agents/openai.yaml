@@ -1,0 +1,7 @@
+interface:
+  display_name: "Add to Vibe Desktop"
+  short_description: "Generate and verify managed local WebUI launchers"
+  default_prompt: "Use $add-app to add this local WebUI to Vibe Desktop and verify that it starts successfully."
+
+policy:
+  allow_implicit_invocation: true
