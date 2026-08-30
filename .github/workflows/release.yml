@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Verify tag and package version
+        run: |
+          expected="v$(node -p "require('./package.json').version")"
+          test "$GITHUB_REF_NAME" = "$expected" || {
+            echo "tag $GITHUB_REF_NAME does not match package version $expected" >&2
+            exit 1
+          }
+      - name: Qualify the public source and installers end to end
+        run: npm run release:verify
+      - name: Materialize the release signing key
+        env:
+          SIGNING_KEY_JSON: ${{ secrets.VIBE_RELEASE_SIGNING_KEY_JSON }}
+        run: |
+          test -n "$SIGNING_KEY_JSON" || {
+            echo "VIBE_RELEASE_SIGNING_KEY_JSON is required" >&2
+            exit 1
+          }
+          install -d -m 700 "$RUNNER_TEMP/vibedesktop-release"
+          umask 077
+          printf '%s' "$SIGNING_KEY_JSON" > "$RUNNER_TEMP/vibedesktop-release/signing-key.json"
+      - run: npm run catalog:build
+      - name: Generate signed release assets
+        env:
+          VIBE_RELEASE_SIGNING_KEY_FILE: ${{ runner.temp }}/vibedesktop-release/signing-key.json
+          VIBE_REQUIRE_SIGNED_RELEASE: "1"
+        run: npm run dist:generate
+      - name: Verify release assets
+        run: |
+          sh -n dist/install.sh
+          sh -n dist/install-app.sh
+          (cd dist && sha256sum -c SHA256SUMS)
+          test -s dist/release-public-key.json
+          test "$(jq -r .releaseVersion dist/manifest.json)" = "${GITHUB_REF_NAME#v}"
+          test "$(jq -r .signature dist/manifest.json)" != "null"
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          assets=(
+            dist/install.sh
+            dist/install-app.sh
+            dist/manifest.json
+            dist/release-public-key.json
+            dist/catalog.json
+            dist/SHA256SUMS
+          )
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" --verify-tag --generate-notes --title "Vibe Desktop $GITHUB_REF_NAME"
+          fi
