@@ -1,0 +1,31 @@
+# vibe-daemon as a systemd --user service: auto-starts on login, survives reboot,
+# logs to journald — `journalctl --user vibedesktop-daemon -f`.
+#
+# Point it at the same XDG data directory, then install:
+#   export VIBE_DAEMON_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/vibed-vibedesktop"
+#   mkdir -p ~/.config/systemd/user
+#   cp daemon/vibedesktop-daemon.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now vibedesktop-daemon
+#
+# If the service fails with "node: not found", systemd --user runs with a minimal
+# PATH — replace "/usr/bin/env node" below with the absolute path from `which node`.
+# Adjust WorkingDirectory if the project lives elsewhere than ~/Projects/vibedesktop.
+
+[Unit]
+Description=Vibe Desktop daemon — local webapp process manager
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Projects/vibedesktop
+ExecStart=/usr/bin/env node daemon/server.mjs
+Restart=on-failure
+RestartSec=3
+Environment=NODE_ENV=production
+Environment=VIBE_DAEMON_DATA_DIR=%h/.local/share/vibed-vibedesktop
+UMask=0077
+
+[Install]
+WantedBy=default.target
