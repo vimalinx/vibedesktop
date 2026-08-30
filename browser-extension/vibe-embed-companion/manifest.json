@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Vibe Desktop Embed Companion",
+  "version": "0.1.2",
+  "description": "Allows websites to render inside Vibe Desktop windows in the dedicated Vibe Desktop Chromium profile.",
+  "permissions": [
+    "declarativeNetRequest",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://127.0.0.1/*",
+        "http://localhost/*"
+      ],
+      "js": [
+        "vibe-desktop-bridge.js"
+      ],
+      "run_at": "document_start"
+    }
+  ]
+}

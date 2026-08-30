@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Vibe Desktop is a local-first web desktop for your apps and AI tools. No login, no cloud account, Apache-2.0.">
+    <meta name="theme-color" content="#0c0e0f">
+    <title>Vibe Desktop — your local web desktop</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Vibe Desktop home">
+        <img src="/icon.svg" width="36" height="36" alt="">
+        <span>Vibe Desktop</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="#features">Features</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/vimalinx/vibedesktop">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span></span> v0.1.2 is public</p>
+          <h1 id="hero-title">Your web apps.<br><em>One local desktop.</em></h1>
+          <p class="lede">A personal desktop for web apps and AI tools that runs on your own Linux machine. No login. No cloud account. Your state stays local.</p>
+          <p class="lede-zh" lang="zh-CN">把网页应用和 AI 工具放进一个真正属于你的本地桌面。</p>
+          <div class="hero-actions">
+            <a class="button primary" href="#install">Install Vibe Desktop</a>
+            <a class="button secondary" href="https://github.com/vimalinx/vibedesktop/releases/tag/v0.1.2">View v0.1.2</a>
+          </div>
+          <ul class="trust-list" aria-label="Project facts">
+            <li>Apache-2.0</li>
+            <li>Signed releases</li>
+            <li>Local JSON state</li>
+          </ul>
+        </div>
+
+        <div class="desktop-preview" aria-label="Illustration of the Vibe Desktop interface">
+          <div class="preview-bar">
+            <span class="preview-mark"></span>
+            <strong>Vibe Desktop</strong>
+            <span class="preview-time">20:08</span>
+          </div>
+          <div class="preview-grid" aria-hidden="true">
+            <span class="preview-app"><i>SB</i>Start Board</span>
+            <span class="preview-app weather"><i>28°</i>Weather</span>
+            <span class="preview-app"><i>AS</i>App Store</span>
+            <span class="preview-app"><i>AI</i>ChatGPT</span>
+            <span class="preview-app"><i>LA</i>Local Apps</span>
+            <span class="preview-app"><i>ST</i>Settings</span>
+          </div>
+          <div class="preview-window" aria-hidden="true">
+            <span>START BOARD</span>
+            <strong>Local services, at a glance.</strong>
+            <div><b></b><b></b><b></b></div>
+          </div>
+          <div class="preview-dock" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        </div>
+      </section>
+
+      <section class="facts" aria-label="Release highlights">
+        <div><strong>348</strong><span>passing tests</span></div>
+        <div><strong>0</strong><span>production vulnerabilities</span></div>
+        <div><strong>1</strong><span>command to install</span></div>
+        <div><strong>100%</strong><span>local control</span></div>
+      </section>
+
+      <section class="feature-section" id="features" aria-labelledby="features-title">
+        <div class="section-heading">
+          <p class="eyebrow">BUILT FOR THE MACHINE YOU OWN</p>
+          <h2 id="features-title">A desktop shell, not another account.</h2>
+        </div>
+        <div class="feature-grid">
+          <article>
+            <span class="feature-number">01</span>
+            <h3>Local-first by default</h3>
+            <p>Desktop state lives in a local JSON file. The app binds to loopback and needs no hosted identity provider.</p>
+          </article>
+          <article>
+            <span class="feature-number">02</span>
+            <h3>Web apps feel organized</h3>
+            <p>Keep URL apps, AI tools, and local WebUIs together. Open them in desktop windows or explicit browser tabs.</p>
+          </article>
+          <article>
+            <span class="feature-number">03</span>
+            <h3>Local services stay visible</h3>
+            <p>The optional <code>vibed</code> daemon starts, stops, health-checks, and logs local WebUI processes.</p>
+          </article>
+          <article>
+            <span class="feature-number">04</span>
+            <h3>Updates you can verify</h3>
+            <p>Release assets carry checksums and Ed25519 signatures. Versioned installs keep a last-known-good rollback path.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="install-section" id="install" aria-labelledby="install-title">
+        <div>
+          <p class="eyebrow">LINUX · GIT · ONE COMMAND</p>
+          <h2 id="install-title">Install the whole desktop.</h2>
+          <p>The installer selects the first free port from 3000–3010, brings a pinned Node runtime when needed, and creates a user service. Pin a port with <code>--port</code>.</p>
+        </div>
+        <div class="command-card">
+          <div class="command-header"><span>Terminal</span><span>v0.1.2</span></div>
+          <pre><code id="install-command">curl -fsSL https://github.com/vimalinx/vibedesktop/releases/latest/download/install-app.sh | sh</code></pre>
+          <button class="copy-button" type="button" data-copy-target="install-command">Copy command</button>
+          <p class="copy-status" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="boundary" aria-labelledby="boundary-title">
+        <p class="eyebrow">CLEAR SECURITY BOUNDARY</p>
+        <h2 id="boundary-title">The public catalog contains links, never recipes that execute on your machine.</h2>
+        <a href="https://github.com/vimalinx/vibedesktop/blob/main/SECURITY.md">Read the security model <span aria-hidden="true">→</span></a>
+      </section>
+    </main>
+
+    <footer>
+      <div class="brand footer-brand">
+        <img src="/icon.svg" width="32" height="32" alt="">
+        <span>Vibe Desktop</span>
+      </div>
+      <p>Local-first. Single-user. Open source.</p>
+      <div>
+        <a href="https://github.com/vimalinx/vibedesktop">Source</a>
+        <a href="https://github.com/vimalinx/vibedesktop/issues">Issues</a>
+        <a href="https://github.com/vimalinx/vibedesktop/blob/main/LICENSE">License</a>
+      </div>
+    </footer>
+  </body>
+</html>

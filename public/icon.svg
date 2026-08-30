@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Vibe Desktop">
+  <defs>
+    <linearGradient id="bg" x1="84" y1="44" x2="420" y2="466" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#15314a"/>
+      <stop offset="0.55" stop-color="#102235"/>
+      <stop offset="1" stop-color="#07131f"/>
+    </linearGradient>
+    <linearGradient id="arc" x1="104" y1="305" x2="408" y2="305" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f8d56b"/>
+      <stop offset="0.5" stop-color="#a9f3d0"/>
+      <stop offset="1" stop-color="#7cc7ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <path d="M104 304c58-142 246-142 304 0" fill="none" stroke="url(#arc)" stroke-width="44" stroke-linecap="round"/>
+  <circle cx="164" cy="322" r="38" fill="#f8d56b"/>
+  <circle cx="348" cy="322" r="38" fill="#7cc7ff"/>
+  <path d="M204 386h104" stroke="#f5f0df" stroke-width="28" stroke-linecap="round"/>
+</svg>
