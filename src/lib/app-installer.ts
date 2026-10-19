@@ -451,17 +451,18 @@ async function migrateLegacyDesktopState() {
   await chmod(target, 0o600);
 }
 
+// Plain Promise rather than Promise.withResolvers: the installer must run on Node 20.
 function run(cmd, args, options = {}) {
-  const { promise, resolve, reject } = Promise.withResolvers();
-  const child = spawn(cmd, args, { ...options, stdio: ["ignore", "pipe", "pipe"] });
-  const stderr = [];
-  child.stderr?.on("data", (c) => stderr.push(c));
-  child.once("error", reject);
-  child.once("exit", (code) => {
-    if (code === 0) resolve();
-    else reject(new Error(cmd + " " + args.join(" ") + " exited " + code + "\\n" + Buffer.concat(stderr).toString()));
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { ...options, stdio: ["ignore", "pipe", "pipe"] });
+    const stderr = [];
+    child.stderr?.on("data", (c) => stderr.push(c));
+    child.once("error", reject);
+    child.once("exit", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(cmd + " " + args.join(" ") + " exited " + code + "\\n" + Buffer.concat(stderr).toString()));
+    });
   });
-  return promise;
 }
 
 function absoluteXdg(value, fallback) {

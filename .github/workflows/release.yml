@@ -19,6 +19,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # Python recipes (ComfyUI, Chainlit, …) are qualified with uv, as on users' machines.
+      - uses: astral-sh/setup-uv@v6
       - run: npm ci
       - name: Verify tag and package version
         run: |

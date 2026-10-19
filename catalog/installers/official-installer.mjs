@@ -351,13 +351,25 @@ async function run(command, args, cwd, timeoutMs = defaultCommandTimeoutMs) {
       terminate(child);
       reject(new Error(`${command} timed out after ${Math.round(timeoutMs / 60000)} minutes.`));
     }, timeoutMs);
-    child.once("error", (error) => { clearTimeout(timer); reject(error); });
+    child.once("error", (error) => { clearTimeout(timer); reject(missingTool(command, error)); });
     child.once("exit", (code, signal) => {
       clearTimeout(timer);
       if (code === 0) resolve();
       else reject(new Error(`${command} failed (${signal ?? code ?? "unknown"}).`));
     });
   });
+}
+
+const toolHints = {
+  uv: "Install uv (https://docs.astral.sh/uv/) to set up Python apps, then retry.",
+  docker: "Install Docker with the compose plugin and make sure your user can run it, then retry.",
+  git: "Install git, then retry."
+};
+
+/** A missing prerequisite deserves a sentence the user can act on, not `spawn uv ENOENT`. */
+function missingTool(command, error) {
+  if (error?.code !== "ENOENT") return error;
+  return new Error(`${command} is not installed or not on PATH. ${toolHints[command] ?? `Install ${command}, then retry.`}`);
 }
 
 async function capture(command, args, cwd, timeoutMs = defaultCommandTimeoutMs) {
@@ -371,7 +383,7 @@ async function capture(command, args, cwd, timeoutMs = defaultCommandTimeoutMs) 
       terminate(child);
       reject(new Error(`${command} timed out after ${Math.round(timeoutMs / 60000)} minutes.`));
     }, timeoutMs);
-    child.once("error", (error) => { clearTimeout(timer); reject(error); });
+    child.once("error", (error) => { clearTimeout(timer); reject(missingTool(command, error)); });
     child.once("exit", (code, signal) => {
       clearTimeout(timer);
       if (code === 0) resolve(stdout);

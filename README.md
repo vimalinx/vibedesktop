@@ -142,7 +142,7 @@ All paths follow `XDG_*` overrides. Updates never touch configuration or state.
 <summary>Install options</summary>
 
 The installer picks the first free port from 3000 to 3010. Pin one with
-`curl … | sh -s -- --port 3002`, choose a version with `--tag v0.2.0`, or install from
+`curl … | sh -s -- --port 3002`, choose a version with `--tag v0.2.1`, or install from
 a fork with `--repo <url>`.
 
 Running behind a reverse proxy or SSH port forward? Set `VIBE_PUBLIC_ORIGIN` to the

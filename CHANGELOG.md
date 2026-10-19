@@ -3,6 +3,15 @@
 All notable user-visible changes are documented here. Vibe Desktop follows
 semantic versioning from the first public 0.2 release onward.
 
+## 0.2.1 - 2026-10-20
+
+- The whole-app installer runs on Node.js 20 again (it used a Node 22-only API).
+- Official app installers explain a missing `uv`, `docker`, or `git` instead of
+  failing with `spawn … ENOENT`.
+- The release pipeline installs `uv` so Python recipes are qualified as on
+  users' machines. The 0.2.0 tag was published but its release build failed on
+  these two issues, so 0.2.1 is the first 0.2 release with downloadable assets.
+
 ## 0.2.0 - 2026-10-20
 
 Vibe Desktop is now positioned as one local desktop for every frontend +
