@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { apiError, rejectCrossOriginMutation, RequestValidationError, requireString } from "@/lib/api-response";
+import { apiError, rejectCrossOriginMutation, RequestValidationError, requireString, invalidJsonBody, readJsonObject } from "@/lib/api-response";
 import { AuthRequiredError, requireCurrentUser } from "@/lib/auth";
 import { createDesktopApp } from "@/lib/persistence";
 import type { IconKind, OpeningMode } from "@/lib/contracts";
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   if (csrf) return csrf;
   try {
     const user = await requireCurrentUser();
-    const body = (await request.json()) as {
+    const body = (await readJsonObject(request)) as null | {
       title?: string;
       url?: string;
       description?: string | null;
@@ -22,6 +22,7 @@ export async function POST(request: Request) {
       gridY?: number;
       setAsStart?: boolean;
     };
+    if (!body) return invalidJsonBody();
     const url = requireHttpUrl(body.url, "url");
     const payload = await createDesktopApp(user, {
       kind: "url",

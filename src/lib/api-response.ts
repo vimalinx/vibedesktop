@@ -93,3 +93,13 @@ export class RequestValidationError extends Error {
     this.name = "RequestValidationError";
   }
 }
+
+/** The request body as a JSON object, or null for an empty, malformed, or non-object body. */
+export async function readJsonObject(request: Request): Promise<Record<string, unknown> | null> {
+  const body: unknown = await request.json().catch(() => null);
+  return body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>) : null;
+}
+
+export function invalidJsonBody() {
+  return apiError(400, "invalid_json", "Send a JSON object in the request body.");
+}

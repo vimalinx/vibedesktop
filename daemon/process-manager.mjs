@@ -14,6 +14,9 @@ import { prepareSpawnOptions, readProcessGroupUsage, signalProcessTree } from ".
 
 const MAX_LOG_LINES = 1000;
 const MAX_LOG_BYTES = 5 * 1024 * 1024;
+const MAX_LOG_LINE_CHARS = 8 * 1024;
+// Lines waiting for the disk; beyond this a burst is summarized instead of queued.
+const MAX_PENDING_LOG_LINES = 5000;
 const STOP_GRACE_MS = 3000;
 const METRICS_INTERVAL_MS = 2000;
 // Supervision: restart policy backoff ladder.
@@ -47,6 +50,8 @@ export class ProcessManager {
     this.controlTails = new Map();
     /** @type {Map<string, Promise<void>>} */
     this.logWriteTails = new Map();
+    /** @type {Map<string, { lines: string[]; dropped: number; queued: boolean }>} */
+    this.logPending = new Map();
     this.logDir = options.logDir ? path.resolve(options.logDir) : null;
     this.metricsSampling = false;
     // Refresh `healthy` on each running app every 5s — whether the port is
@@ -226,17 +231,25 @@ export class ProcessManager {
     await Promise.all(targets.map((rt) => this._probeOne(rt)));
   }
 
-  /** @param {Runtime} rt */
+  /**
+   * Apps are opened at `localhost`, which may resolve to either loopback family
+   * (Vite and other Node dev servers bind only `::1` on many systems).
+   * @param {Runtime} rt
+   */
   async _probeOne(rt) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2000);
-    try {
-      await fetch(`http://localhost:${rt.port}/`, { signal: controller.signal });
-      rt.healthy = true;
-    } catch {
-      rt.healthy = false; // refused, timed out, or reset — not serving yet
-    } finally {
-      clearTimeout(timer);
+    for (const host of ["127.0.0.1", "[::1]"]) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 2000);
+      try {
+        const response = await fetch(`http://${host}:${rt.port}/`, { signal: controller.signal });
+        rt.healthy = response.ok;
+        await response.body?.cancel();
+        return;
+      } catch {
+        rt.healthy = false; // refused, timed out, or reset — not serving yet
+      } finally {
+        clearTimeout(timer);
+      }
     }
   }
 
@@ -288,7 +301,7 @@ export class ProcessManager {
   /**
    * @param {string} id
    * @param {"start" | "stop" | "restart"} action
-   * @param {LocalAppConfig} [cfg]  required for start/restart
+   * @param {LocalAppConfig | (() => Promise<LocalAppConfig>)} [cfg]  required for start/restart; a loader is read inside the queue
    */
   async control(id, action, cfg) {
     if (action !== "start" && action !== "stop" && action !== "restart") {
@@ -299,6 +312,9 @@ export class ProcessManager {
         await this.stop(id);
         return;
       }
+      // A loader reads the config inside the queue, so a queued start never
+      // runs a command that was edited or deleted while it waited.
+      if (typeof cfg === "function") cfg = await cfg();
       if (action === "start") {
         if (!cfg) throw Object.assign(new Error("config required for start/restart"), { code: "bad_request" });
         // Start is idempotent at the control boundary. A duplicate HTTP
@@ -321,6 +337,17 @@ export class ProcessManager {
    * @param {() => Promise<void>} operation
    * @returns {Promise<void>}
    */
+  /**
+   * Run work (for example stop-and-delete) in the same per-application queue as start/stop/restart.
+   * @template T
+   * @param {string} id
+   * @param {() => Promise<T>} operation
+   * @returns {Promise<T>}
+   */
+  serialize(id, operation) {
+    return this.#queueControl(id, operation);
+  }
+
   #queueControl(id, operation) {
     const prior = this.controlTails.get(id) ?? Promise.resolve();
     const result = prior.then(operation, operation);
@@ -366,23 +393,47 @@ export class ProcessManager {
 
   /** @param {string} id */
   async deleteLogs(id) {
+    this.logPending.delete(id);
     await this.logWriteTails.get(id);
     if (this.logDir) await rm(this._logPath(id), { force: true });
     const rt = this.runtimes.get(id);
     if (rt) rt.logs = [];
   }
 
-  /** @param {string} id @param {string} line */
+  /**
+   * Lines are buffered per app and appended in batches: a chatty app costs one
+   * queued write at a time, not one per line, and a burst the disk cannot keep
+   * up with is summarized rather than growing daemon memory.
+   * @param {string} id @param {string} line
+   */
   _persistLogLine(id, line) {
     if (!this.logDir) return;
+    const pending = this.logPending.get(id) ?? { lines: [], dropped: 0, queued: false };
+    this.logPending.set(id, pending);
+    pending.lines.push(line.length > MAX_LOG_LINE_CHARS ? `${line.slice(0, MAX_LOG_LINE_CHARS)} …[truncated]` : line);
+    if (pending.lines.length > MAX_PENDING_LOG_LINES) {
+      pending.lines.shift();
+      pending.dropped += 1;
+    }
+    if (pending.queued) return;
+    pending.queued = true;
     const prior = this.logWriteTails.get(id) ?? Promise.resolve();
     const write = prior.then(async () => {
+      pending.queued = false;
+      const batch = pending.lines.splice(0);
+      if (pending.dropped) {
+        batch.unshift(`[${new Date().toISOString()}] vibed ${pending.dropped} log line(s) dropped while the disk caught up`);
+        pending.dropped = 0;
+      }
+      if (this.logPending.get(id) === pending && !pending.lines.length) this.logPending.delete(id);
+      if (!batch.length) return;
       await mkdir(this.logDir, { recursive: true, mode: 0o700 });
       const logPath = this._logPath(id);
-      await appendFile(logPath, `${line}\n`, { encoding: "utf8", mode: 0o600 });
+      await appendFile(logPath, `${batch.join("\n")}\n`, { encoding: "utf8", mode: 0o600 });
       const info = await stat(logPath);
       if (info.size <= MAX_LOG_BYTES) return;
-      const compacted = tailLines(await readFile(logPath, "utf8"));
+      // Compact to half the cap so long lines cannot force a rewrite on every append.
+      const compacted = tailLines(await readFile(logPath, "utf8"), MAX_LOG_BYTES / 2);
       const temporary = `${logPath}.${process.pid}.${randomUUID()}.tmp`;
       await writeFile(temporary, compacted.length ? `${compacted.join("\n")}\n` : "", { encoding: "utf8", mode: 0o600 });
       await rename(temporary, logPath);
@@ -458,6 +509,14 @@ function emptyMetrics() {
 }
 
 /** @param {string} contents */
-function tailLines(contents) {
-  return contents.split(/\r?\n/).filter(Boolean).slice(-MAX_LOG_LINES);
+/** @param {string} contents @param {number} [maxBytes] */
+function tailLines(contents, maxBytes = Infinity) {
+  const lines = contents.split(/\r?\n/).filter(Boolean).slice(-MAX_LOG_LINES);
+  let bytes = 0;
+  let start = lines.length;
+  while (start > 0 && bytes + Buffer.byteLength(lines[start - 1]) + 1 <= maxBytes) {
+    start -= 1;
+    bytes += Buffer.byteLength(lines[start]) + 1;
+  }
+  return lines.slice(start);
 }

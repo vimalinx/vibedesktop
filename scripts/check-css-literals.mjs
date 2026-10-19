@@ -29,7 +29,7 @@ const source = readFileSync(cssPath, "utf8");
 /** Budgets recorded 2026-07-26 after the token migration. Lower them, never raise. */
 const BUDGETS = {
   "color:plain": 82,
-  "color:depth": 63,
+  "color:depth": 54,
   "duration:plain": 11,
   "duration:animation": 22,
   "easing:plain": 0,

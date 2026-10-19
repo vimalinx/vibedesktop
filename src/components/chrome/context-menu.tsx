@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Grid3X3, Palette, Plus } from "lucide-react";
 import type { DesktopApp, LocalAppView } from "@/lib/contracts";
 import type { DesktopGridSpan } from "@/lib/desktop-grid";
 import { allowedTileSpans, isTileVariant } from "@/lib/tile-contract";
@@ -69,6 +70,8 @@ export function ContextMenu({
   onResize: (app: DesktopApp, span: DesktopGridSpan) => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const typeaheadRef = useRef("");
+  const typeaheadTimerRef = useRef<number | null>(null);
 
   /* A menu opened from the keyboard has to be usable and dismissable from the
      keyboard: focus moves in on open, Escape closes it, and focus goes back to
@@ -83,6 +86,17 @@ export function ContextMenu({
     };
   }, [state]);
 
+  useEffect(() => {
+    const dismiss = () => onDismiss();
+    window.addEventListener("resize", dismiss);
+    window.addEventListener("scroll", dismiss, true);
+    return () => {
+      window.removeEventListener("resize", dismiss);
+      window.removeEventListener("scroll", dismiss, true);
+      if (typeaheadTimerRef.current !== null) window.clearTimeout(typeaheadTimerRef.current);
+    };
+  }, [onDismiss]);
+
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape") {
       event.preventDefault();
@@ -90,10 +104,26 @@ export function ContextMenu({
       onDismiss();
       return;
     }
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-    event.preventDefault();
     const items = [...(menuRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])];
     if (items.length === 0) return;
+    if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      items[event.key === "Home" ? 0 : items.length - 1].focus();
+      return;
+    }
+    if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      typeaheadRef.current += event.key.toLocaleLowerCase();
+      if (typeaheadTimerRef.current !== null) window.clearTimeout(typeaheadTimerRef.current);
+      typeaheadTimerRef.current = window.setTimeout(() => { typeaheadRef.current = ""; }, 500);
+      const match = items.find((item) => item.innerText.trim().toLocaleLowerCase().startsWith(typeaheadRef.current));
+      if (match) {
+        event.preventDefault();
+        match.focus();
+      }
+      return;
+    }
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
     const index = items.indexOf(document.activeElement as HTMLButtonElement);
     const step = event.key === "ArrowDown" ? 1 : -1;
     items[(index + step + items.length) % items.length].focus();
@@ -118,11 +148,12 @@ export function ContextMenu({
       {state.kind === "desktop" ? (
         <>
           <button role="menuitem" onClick={onAdd}>
-            <span aria-hidden="true">+</span>
+            <Plus size={15} aria-hidden="true" />
             {t.contextMenu.addApp}
           </button>
-          <button role="menuitem" onClick={onAutoArrange}>{t.contextMenu.autoArrange}</button>
-          <button role="menuitem" onClick={onWallpaper}>{t.contextMenu.changeWallpaper}</button>
+          <button role="menuitem" onClick={onAutoArrange}><Grid3X3 size={15} aria-hidden="true" /> {t.contextMenu.autoArrange}</button>
+          <div className="context-menu-separator" role="separator" />
+          <button role="menuitem" onClick={onWallpaper}><Palette size={15} aria-hidden="true" /> {t.contextMenu.changeWallpaper}</button>
         </>
       ) : state.kind === "local-app" ? (
         <>

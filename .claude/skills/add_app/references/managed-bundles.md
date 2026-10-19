@@ -23,7 +23,8 @@ process group. The first detected service is primary and supplies the desktop
 URL and health probe. If any child exits unexpectedly, the wrapper terminates
 the remaining children and exits non-zero so `restart: on-crash` restarts the
 whole application. A daemon stop sends TERM to the process group and exits
-cleanly.
+cleanly. In a multi-service bundle every output line is prefixed with
+`[service-name]`, so the desktop can filter the shared daemon log per service.
 
 ## Detection rules
 
@@ -39,7 +40,9 @@ cleanly.
 
 ## Failure handling
 
-`--plan` is read-only. Normal generation writes the bundle before registering.
+`--plan` is read-only. `--json` prints exactly one JSON result on stdout
+(progress moves to stderr); the desktop's Import project flow uses it.
+`--name <name>` overrides the directory-derived app name. Normal generation writes the bundle before registering.
 An HTTP registration failure deletes the generated bundle. With `--start`, a
 failed start or unhealthy primary endpoint deletes the registration and bundle.
 Existing external processes are not stopped or modified.

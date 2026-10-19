@@ -7,7 +7,7 @@
  *
  * Mirrors the atomic-write pattern of src/lib/store.ts (temp file + rename).
  */
-import { readFile, writeFile, rename, mkdir, chmod } from "node:fs/promises";
+import { readFile, rename, mkdir, chmod, copyFile, open } from "node:fs/promises";
 import path from "node:path";
 
 const FILENAME = "daemon-config.json";
@@ -28,6 +28,7 @@ export class ConfigStore {
    */
   constructor(dataDir) {
     this.filePath = path.join(dataDir, FILENAME);
+    this.backupPath = `${this.filePath}.bak`;
     this.dataDir = dataDir;
     // Atomic rename prevents a partial file from being observed, but it does
     // not stop concurrent read-modify-write operations from overwriting each
@@ -36,17 +37,20 @@ export class ConfigStore {
     this.mutationTail = Promise.resolve();
   }
 
-  /** @returns {Promise<LocalAppConfig[]>} */
+  /**
+   * A truncated or corrupt file (power loss, disk full) must not keep the daemon
+   * from starting: fall back to the last good copy and set the bad file aside.
+   * @returns {Promise<LocalAppConfig[]>}
+   */
   async load() {
-    try {
-      const raw = await readFile(this.filePath, "utf8");
-      const parsed = JSON.parse(raw);
-      if (!parsed || !Array.isArray(parsed.apps)) return [];
-      return parsed.apps.filter(isValidConfig).map(projectStoredConfig);
-    } catch (err) {
-      if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") return [];
-      throw err;
-    }
+    const primary = await readConfigFile(this.filePath);
+    if (primary.ok) return primary.apps;
+    if (primary.missing) return (await readConfigFile(this.backupPath)).apps ?? [];
+    const backup = await readConfigFile(this.backupPath);
+    const aside = `${this.filePath}.corrupt-${Date.now()}`;
+    await rename(this.filePath, aside).catch(() => {});
+    console.error(`[vibe-daemon] ${this.filePath} was unreadable; moved to ${aside}${backup.ok ? " and restored the last good copy" : ""}.`);
+    return backup.apps ?? [];
   }
 
   async #save(/** @type {LocalAppConfig[]} */ apps) {
@@ -54,7 +58,16 @@ export class ConfigStore {
     if (process.platform !== "win32") await chmod(this.dataDir, 0o700);
     const payload = JSON.stringify({ version: SCHEMA_VERSION, apps }, null, 2) + "\n";
     const tmp = `${this.filePath}.${process.pid}.${crypto.randomUUID()}.tmp`;
-    await writeFile(tmp, payload, { encoding: "utf8", mode: 0o600 });
+    // fsync before rename so a crash leaves either the old or the new file, never a torn one.
+    const handle = await open(tmp, "wx", 0o600);
+    try {
+      await handle.writeFile(payload, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    // Keep the previous good file as the recovery copy load() falls back to.
+    if ((await readConfigFile(this.filePath)).ok) await copyFile(this.filePath, this.backupPath).catch(() => {});
     await rename(tmp, this.filePath);
     // App configs can contain local paths, launch recipes, and environment
     // overrides. Keep an existing file private too, even if it was created by
@@ -157,6 +170,26 @@ export class ConfigStore {
       if (next.length === apps.length) throw notFound(id);
       await this.#save(next);
     });
+  }
+}
+
+/**
+ * @param {string} file
+ * @returns {Promise<{ ok: true; apps: LocalAppConfig[]; missing?: false } | { ok: false; missing: boolean; apps?: undefined }>}
+ */
+async function readConfigFile(file) {
+  let raw;
+  try {
+    raw = await readFile(file, "utf8");
+  } catch (err) {
+    return { ok: false, missing: Boolean(err && typeof err === "object" && "code" in err && err.code === "ENOENT") };
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.apps)) return { ok: false, missing: false };
+    return { ok: true, apps: parsed.apps.filter(isValidConfig).map(projectStoredConfig) };
+  } catch {
+    return { ok: false, missing: false };
   }
 }
 

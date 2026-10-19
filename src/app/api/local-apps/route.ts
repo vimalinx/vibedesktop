@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { apiError, rejectCrossOriginMutation } from "@/lib/api-response";
+import { apiError, rejectCrossOriginMutation, invalidJsonBody, readJsonObject } from "@/lib/api-response";
 import { AuthRequiredError, requireCurrentUser } from "@/lib/auth";
-import { DaemonApiError, DaemonUnreachableError, listLocalApps, createLocalApp } from "@/lib/daemon-client";
+import { DaemonApiError, DaemonTimeoutError, DaemonUnreachableError, listLocalApps, createLocalApp } from "@/lib/daemon-client";
 import type { IconKind, LocalAppControlAction } from "@/lib/contracts";
 
 export const runtime = "nodejs";
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   if (csrf) return csrf;
   try {
     await requireCurrentUser();
-    const body = (await request.json()) as {
+    const body = (await readJsonObject(request)) as null | {
       name?: string;
       command?: string;
       args?: string[];
@@ -33,6 +33,7 @@ export async function POST(request: Request) {
       iconKind?: IconKind;
       iconUrl?: string | null;
     };
+    if (!body) return invalidJsonBody();
 
     if (!body.name?.trim()) {
       return apiError(400, "invalid_request", "name is required");
@@ -70,6 +71,7 @@ function handleError(error: unknown) {
   if (error instanceof AuthRequiredError) {
     return apiError(401, "auth_required", error.message);
   }
+  if (error instanceof DaemonTimeoutError) return apiError(504, "daemon_timeout", error.message);
   if (error instanceof DaemonUnreachableError) {
     return apiError(503, "daemon_unreachable", error.message);
   }

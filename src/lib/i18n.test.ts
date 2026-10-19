@@ -40,4 +40,23 @@ describe("i18n", () => {
       expect(messagesForLocale(locale).dock.addApp).not.toMatch(/^\s*\+/);
     }
   });
+
+  it("keeps installation details behind the catalog install action", () => {
+    const en = messagesForLocale("en");
+    const zh = messagesForLocale("zh");
+
+    expect(en.appStore.installWorkspace).toBe("Install");
+    expect(zh.appStore.installWorkspace).toBe("安装");
+    expect(en.appStore.officialInstall).toBe("Official installation");
+    expect(zh.appStore.officialInstall).toBe("官方安装");
+  });
+
+  it("uses desktop personalization language for wallpaper controls", () => {
+    const en = messagesForLocale("en");
+    const zh = messagesForLocale("zh");
+
+    expect(en.contextMenu.changeWallpaper).toBe("Personalize");
+    expect(zh.contextMenu.changeWallpaper).toBe("个性化");
+    expect(zh.dialogs.wallpaperFits).toEqual({ cover: "填充", contain: "适应", stretch: "拉伸", center: "居中" });
+  });
 });

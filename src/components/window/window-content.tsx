@@ -31,6 +31,8 @@ export function WindowContent({
   onWeatherCityChange,
   onWeatherRefresh,
   onAddDirectoryApp,
+  onOpenCatalogTrial,
+  onOpenLocalApps,
   onOpenUrlApp,
   localApps,
   onRefreshLocalApps,
@@ -53,6 +55,8 @@ export function WindowContent({
   onWeatherCityChange: (city: string) => void;
   onWeatherRefresh: () => Promise<void>;
   onAddDirectoryApp: (id: string) => Promise<void>;
+  onOpenCatalogTrial: (input: { id: string; url: string; title: string; iconUrl: string }) => void;
+  onOpenLocalApps: () => void;
   onOpenUrlApp: (input: { id: string; url: string; title: string }) => void;
   /** Polled once by the desktop; the local-apps panel reads this list. */
   localApps: LocalAppView[];
@@ -72,6 +76,10 @@ export function WindowContent({
       <AppStorePanel
         t={t}
         onAddDirectoryApp={onAddDirectoryApp}
+        onOpenTrial={onOpenCatalogTrial}
+        onOpenLocalApps={onOpenLocalApps}
+        onRefreshLocalApps={onRefreshLocalApps}
+        installedUrls={payload.apps.filter((item) => item.source === "directory" && item.url).map((item) => item.url!)}
       />
     );
   }

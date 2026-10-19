@@ -1,0 +1,294 @@
+{
+  "session.read": {
+    "method": "GET",
+    "path": "/me",
+    "capability": "desktop",
+    "required": [
+      "user"
+    ]
+  },
+  "desktop.read": {
+    "method": "GET",
+    "path": "/desktop",
+    "capability": "desktop",
+    "required": [
+      "user",
+      "desktop",
+      "apps",
+      "wallpapers",
+      "themes",
+      "shellStyles"
+    ]
+  },
+  "desktop.update": {
+    "method": "PATCH",
+    "path": "/desktop",
+    "capability": "desktop",
+    "required": [
+      "user",
+      "desktop",
+      "apps"
+    ]
+  },
+  "desktop.restore": {
+    "method": "POST",
+    "path": "/desktop/restore",
+    "capability": "backup",
+    "required": [
+      "user",
+      "desktop",
+      "apps"
+    ]
+  },
+  "apps.create": {
+    "method": "POST",
+    "path": "/apps",
+    "capability": "desktop",
+    "required": [
+      "user",
+      "desktop",
+      "apps"
+    ]
+  },
+  "apps.update": {
+    "method": "PATCH",
+    "path": "/apps/:id",
+    "capability": "desktop",
+    "required": [
+      "user",
+      "desktop",
+      "apps"
+    ]
+  },
+  "apps.delete": {
+    "method": "DELETE",
+    "path": "/apps/:id",
+    "capability": "desktop",
+    "required": [
+      "user",
+      "desktop",
+      "apps"
+    ]
+  },
+  "apps.batch": {
+    "method": "POST",
+    "path": "/apps/batch",
+    "capability": "desktop",
+    "required": [
+      "user",
+      "desktop",
+      "apps"
+    ]
+  },
+  "catalog.list": {
+    "method": "GET",
+    "path": "/app-directory",
+    "capability": "catalog",
+    "required": [
+      "items"
+    ]
+  },
+  "catalog.add": {
+    "method": "POST",
+    "path": "/app-directory/:id/add",
+    "capability": "catalog",
+    "required": [
+      "user",
+      "desktop",
+      "apps"
+    ]
+  },
+  "catalog.installs": {
+    "method": "GET",
+    "path": "/catalog-installs",
+    "capability": "catalog.install",
+    "required": [
+      "installs"
+    ]
+  },
+  "catalog.install": {
+    "method": "POST",
+    "path": "/catalog-installs/:id",
+    "capability": "catalog.install",
+    "required": [
+      "install"
+    ]
+  },
+  "catalog.uninstall": {
+    "method": "DELETE",
+    "path": "/catalog-installs/:id",
+    "capability": "catalog.install",
+    "required": [
+      "install"
+    ]
+  },
+  "catalog.agentInstruction": {
+    "method": "GET",
+    "path": "/catalog-installs/:id/agent-instruction",
+    "capability": "catalog.install",
+    "required": [
+      "instruction"
+    ]
+  },
+  "url.resolve": {
+    "method": "POST",
+    "path": "/apps/metadata/resolve",
+    "capability": "metadata",
+    "required": [
+      "url",
+      "title",
+      "description",
+      "iconCandidates"
+    ]
+  },
+  "url.embed": {
+    "method": "POST",
+    "path": "/apps/metadata/embed",
+    "capability": "metadata",
+    "required": [
+      "url",
+      "embeddable",
+      "reason",
+      "message"
+    ]
+  },
+  "localApps.list": {
+    "method": "GET",
+    "path": "/local-apps",
+    "capability": "localApps",
+    "required": [
+      "apps"
+    ]
+  },
+  "localApps.get": {
+    "method": "GET",
+    "path": "/local-apps/:id",
+    "capability": "localApps",
+    "required": [
+      "app"
+    ]
+  },
+  "localApps.create": {
+    "method": "POST",
+    "path": "/local-apps",
+    "capability": "localApps.manage",
+    "required": [
+      "app"
+    ]
+  },
+  "localApps.update": {
+    "method": "PATCH",
+    "path": "/local-apps/:id",
+    "capability": "localApps.manage",
+    "required": [
+      "app"
+    ]
+  },
+  "localApps.remove": {
+    "method": "DELETE",
+    "path": "/local-apps/:id",
+    "capability": "localApps.manage",
+    "required": [
+      "deleted"
+    ]
+  },
+  "localApps.control": {
+    "method": "POST",
+    "path": "/local-apps/:id/control",
+    "capability": "localApps",
+    "required": [
+      "app"
+    ]
+  },
+  "localApps.logs": {
+    "method": "GET",
+    "path": "/local-apps/:id/logs",
+    "capability": "localApps",
+    "required": [
+      "logs"
+    ]
+  },
+  "localApps.discover": {
+    "method": "GET",
+    "path": "/local-apps/discovery",
+    "capability": "localApps.manage",
+    "required": [
+      "candidates"
+    ]
+  },
+  "localApps.icon": {
+    "method": "POST",
+    "path": "/local-apps/:id/resolve-icon",
+    "capability": "metadata",
+    "required": [],
+    "binary": true
+  },
+  "localApps.embed": {
+    "method": "GET",
+    "path": "/local-apps/:id/embed-check",
+    "capability": "metadata",
+    "required": [
+      "embeddable"
+    ]
+  },
+  "localApps.status": {
+    "method": "GET",
+    "path": "/local-apps/daemon-status",
+    "capability": "localApps",
+    "required": [
+      "ok"
+    ]
+  },
+  "system.read": {
+    "method": "GET",
+    "path": "/system/status",
+    "capability": "system.metrics",
+    "required": [
+      "sampledAt",
+      "hostname",
+      "desktop"
+    ]
+  },
+  "version.read": {
+    "method": "GET",
+    "path": "/desktop/version",
+    "capability": "version",
+    "required": [
+      "version",
+      "managed",
+      "local",
+      "canUpdate",
+      "canRollback",
+      "task"
+    ]
+  },
+  "version.change": {
+    "method": "POST",
+    "path": "/desktop/version",
+    "capability": "version",
+    "required": [
+      "ok",
+      "state"
+    ]
+  },
+  "packages.preferences.read": {
+    "method": "GET",
+    "path": "/desktop/packages/:id/preferences",
+    "capability": "packages.preferences",
+    "required": [
+      "revision",
+      "schemaVersion",
+      "values"
+    ]
+  },
+  "packages.preferences.replace": {
+    "method": "PUT",
+    "path": "/desktop/packages/:id/preferences",
+    "capability": "packages.preferences",
+    "required": [
+      "revision",
+      "schemaVersion",
+      "values"
+    ]
+  }
+}

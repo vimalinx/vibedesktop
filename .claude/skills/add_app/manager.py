@@ -2,6 +2,8 @@
 """Generate private, auditable launch bundles for vibed-managed WebUIs."""
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import hashlib
 import json
 import os
@@ -23,6 +25,19 @@ def managed_root() -> Path:
     data_home = os.environ.get("XDG_DATA_HOME", "").strip()
     base = Path(data_home).expanduser() if data_home and Path(data_home).is_absolute() else Path.home() / ".local" / "share"
     return base / "vibedesktop" / "managed-apps"
+
+
+@contextlib.contextmanager
+def import_lock():
+    """Serialize registrations so the already-registered check and the registration are atomic."""
+    root = managed_root()
+    root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with open(root / ".import.lock", "a") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
 
 
 def bundle_dir(name: str, project_root: str) -> Path:
@@ -79,12 +94,16 @@ def render_wrapper(manifest: dict) -> str:
     ]
     # Dependencies start first; the primary browser-facing service starts last.
     execution_order = [*manifest["services"][1:], manifest["services"][0]]
+    # A bundle shares one daemon log; tagging each line lets the desktop split it per service.
+    tagged = len(manifest["services"]) > 1
     for service in execution_order:
         command = shlex.join([service["command"], *service["args"]])
+        tag = shlex.quote(f"[{service['name']}]")
         lines.extend([
             f"printf '%s\\n' {shlex.quote('[vibedesktop] starting ' + service['name'] + ' on :' + str(service['port']))}",
             "(",
             f"  cd {shlex.quote(service['cwd'])}",
+            *([f"  exec > >(while IFS= read -r line; do printf '%s %s\\n' {tag} \"$line\"; done) 2>&1"] if tagged else []),
             f"  exec {command}",
             ") &",
             "pids+=(\"$!\")",

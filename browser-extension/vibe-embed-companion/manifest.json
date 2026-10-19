@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Vibe Desktop Embed Companion",
-  "version": "0.1.8",
+  "version": "0.2.0",
   "description": "Allows websites to render inside Vibe Desktop windows in the dedicated Vibe Desktop Chromium profile.",
   "permissions": [
     "declarativeNetRequest",

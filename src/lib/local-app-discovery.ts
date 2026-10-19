@@ -62,6 +62,7 @@ function normalizeCandidate(value: unknown): LocalAppDiscoveryCandidate | null {
   const args = Array.isArray(raw.args)
     ? raw.args.slice(0, 100).map((arg) => boundedString(arg, 4000)).filter((arg): arg is string => arg !== null)
     : [];
+  const iconUrl = inlineDataImage(raw.icon);
   if (!name || !source || !note || !Number.isInteger(port) || port < 1 || port > 65535) return null;
 
   const registerable = raw.registerable === true && Boolean(command);
@@ -76,8 +77,14 @@ function normalizeCandidate(value: unknown): LocalAppDiscoveryCandidate | null {
     registerable,
     alreadyRegistered: raw.already_registered === true,
     dev: raw.dev === true,
-    note
+    note,
+    ...(raw.icon_kind === "favicon" && iconUrl ? { iconKind: "favicon" as const, iconUrl } : {})
   };
+}
+
+function inlineDataImage(value: unknown): string | null {
+  const icon = boundedString(value, 400_000);
+  return icon && /^data:image\/[a-z0-9.+-]+;/i.test(icon) ? icon : null;
 }
 
 function boundedString(value: unknown, maxLength: number): string | null {

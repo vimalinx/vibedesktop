@@ -4,7 +4,7 @@ import { startTransition, useCallback, useEffect, useMemo, useRef, useState } fr
 import { flushSync } from "react-dom";
 import type { DesktopApp, DesktopPayload, LocalAppView, VibeUser } from "@/lib/contracts";
 import { loadLocalAsset, saveLocalAsset } from "@/lib/browser-local-assets";
-import { desktopData, reasonFor } from "@/lib/desktop-data";
+import { desktopData, reasonFor, DesktopDataError } from "@/lib/desktop-data";
 import {
   desktopGridMinColumns,
   gridSpanIsFree,
@@ -29,10 +29,13 @@ import {
   fetchWeather,
   formatClock,
   initialWindowSize,
+  isLocalAppsApp,
   isLocalApp,
   isRunningStandalone,
+  shellSurfacesConflict,
   isWeatherApp,
   layoutDesktopAppsForViewport,
+  localAssetHydrationKey,
   localAppStatus,
   localAppToVirtualDesktopApps,
   occupiedGridCellsForApps,
@@ -47,14 +50,29 @@ import {
   type WeatherReading
 } from "@/lib/desktop-helpers";
 
+import { restoreWindows, windowSession, windowSessionKey } from "@/lib/window-session";
+
+import { PackageShell } from "@/components/packages/package-shell";
+import { PackageManager } from "@/components/packages/package-manager";
+import { defaultPackageId, selectionKey } from "@/lib/desktop-packages/bundle";
+import { displayAppTitle, iconImageCandidates } from "@/lib/desktop-helpers";
+import { normalizeWindowPatch } from "@/protocol/shell/window-patch";
+import type { DesktopShellCommands } from "@/protocol/shell/package";
+import { CatalogActivity } from "@/components/chrome/catalog-activity";
+import { ProductivityBar } from "@/components/chrome/productivity-bar";
+import { automaticBackupTick } from "@/lib/automatic-backup";
+import { runActivity } from "@/lib/desktop-activity";
 import { BootScreen } from "@/components/chrome/boot-screen";
 import { ContextMenu, type ContextMenuState } from "@/components/chrome/context-menu";
+import { DesktopOnboarding } from "@/components/packages/desktop-onboarding";
 import { TourOverlay } from "@/components/chrome/tour-overlay";
 import { demoLocalApps, makeDemoPayload } from "@/components/chrome/tour-demo-data";
 import { DesktopCanvas, type DesktopDragTarget } from "@/components/desktop/desktop-canvas";
 import { Dock } from "@/components/dock/dock";
-import { DesktopWindow, type AppWindowState } from "@/components/window/desktop-window";
+import { DesktopWindow } from "@/components/window/desktop-window";
+import type { AppWindowState } from "@/protocol/shell/v1";
 import { WindowContent } from "@/components/window/window-content";
+import { WindowErrorBoundary } from "@/components/window/window-error-boundary";
 import { AddAppDialog } from "@/components/dialogs/add-app-dialog";
 import { EditAppDialog } from "@/components/dialogs/edit-app-dialog";
 import { WallpaperDialog } from "@/components/dialogs/wallpaper-dialog";
@@ -87,9 +105,11 @@ function resetDraggedElement(element: HTMLElement): void {
 
 export function VibeDesktop() {
   const iconPlaneRef = useRef<HTMLElement>(null);
-  const autoOpenedStartRef = useRef<string | null>(null);
   const dragRef = useRef<DesktopDragState | null>(null);
   const dragTargetRef = useRef<DesktopDragTarget | null>(null);
+  // The drop preview is painted imperatively so crossing a grid line does not
+  // rerender every desktop icon (which makes photographic wallpapers flash).
+  const dragTargetElementRef = useRef<HTMLDivElement>(null);
   // Click-vs-double-click disambiguation: single click opens embedded (after a
   // short delay so a following double-click can cancel it and open external instead).
   const clickTimerRef = useRef<number | null>(null);
@@ -99,7 +119,27 @@ export function VibeDesktop() {
   const [user, setUser] = useState<VibeUser | null>(null);
   const [payload, setPayload] = useState<DesktopPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [bootError, setBootError] = useState<"" | "protocol_mismatch" | "unreachable">("");
+  const [packageId, setPackageId] = useState<string>(defaultPackageId);
+  const [packageManagerOpen, setPackageManagerOpen] = useState(false);
+  const [workspaceRequest, setWorkspaceRequest] = useState<{ panel: "windows" | "scenes" | "organize" | "activity" } | null>(null);
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search).get("desktop");
+    const requested = query === "windows" ? "org.vibedesktop.windows" : query === "macos" ? "org.vibedesktop.macos" : query;
+    setPackageId(requested || readLocalJson<string>(selectionKey, defaultPackageId));
+    const shortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.altKey && event.key.toLowerCase() === "p") { event.preventDefault(); setPackageManagerOpen(true); }
+    };
+    window.addEventListener("keydown", shortcut);
+    return () => window.removeEventListener("keydown", shortcut);
+  }, []);
+  function selectPackage(id: string) {
+    writeLocalJson(selectionKey, id); setPackageId(id);
+    const url = new URL(window.location.href); url.searchParams.delete("desktop"); window.history.replaceState(null, "", url);
+  }
   const [windows, setWindows] = useState<AppWindowState[]>([]);
+  const windowStack = useMemo(() => new Map([...windows].sort((a,b) => a.z-b.z).map((item,index) => [item.id,index+10])), [windows]);
+  const [filteredIds, setFilteredIds] = useState<string[] | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editingApp, setEditingApp] = useState<DesktopApp | null>(null);
@@ -110,8 +150,8 @@ export function VibeDesktop() {
     name: string;
   } | null>(null);
   const [onboardingVisible, setOnboardingVisible] = useState(false);
+  const legacyTour = onboardingVisible && packageId === "classic";
   const [activeDragAppId, setActiveDragAppId] = useState<string | null>(null);
-  const [dragTarget, setDragTarget] = useState<DesktopDragTarget | null>(null);
   const [localAssets, setLocalAssets] = useState<Record<string, string>>({});
   // SSR renders with "en" (matching detectInitialLocale's server return).
   // After mount, an effect swaps in the real client locale. Avoids hydration
@@ -125,10 +165,16 @@ export function VibeDesktop() {
   const [weather, setWeather] = useState<WeatherReading | null>(() => readWeatherReading());
   const [weatherStatus, setWeatherStatus] = useState("");
   const [localApps, setLocalApps] = useState<LocalAppView[]>([]);
+  const realLocalAppsRef = useRef<LocalAppView[] | null>(null);
   const [localAppLayout, setLocalAppLayout] = useState<
     Record<string, { gridX: number; gridY: number; spanColumns?: number; spanRows?: number }>
   >(() => readLocalJson("vd:local-app-layout", {}));
   const [tileNotice, setTileNotice] = useState("");
+  const [localAppsError, setLocalAppsError] = useState("");
+  const [localAppsLoaded, setLocalAppsLoaded] = useState(false);
+  const [sessionRestored, setSessionRestored] = useState(false);
+  const refreshPending = useRef(false);
+  const pendingLocalSession = useRef<unknown>(null);
 
   const t = messagesForLocale(locale);
   const desktopHasWeather = payload?.apps.some(isWeatherApp) ?? false;
@@ -172,19 +218,28 @@ export function VibeDesktop() {
   );
 
   const refreshLocalApps = useCallback(async () => {
-    const localAppsSource = desktopData().localApps;
+    if (refreshPending.current) return;
+    refreshPending.current = true;
     try {
-      setLocalApps(await localAppsSource.list());
-    } catch {
-      // Daemon down / unreachable — clear the icons rather than show stale state.
-      setLocalApps([]);
+      setLocalApps(await desktopData().localApps.list());
+      setLocalAppsError("");
+    } catch (error) {
+      setLocalAppsError(error instanceof DesktopDataError && error.code === "daemon_unreachable" ? "daemon_unreachable" : reasonFor(error) ?? "daemon_unreachable");
+    } finally {
+      refreshPending.current = false;
+      setLocalAppsLoaded(true);
     }
   }, []);
 
   useEffect(() => {
-    if (onboardingVisible) {
+    if (legacyTour) {
+      if (realLocalAppsRef.current === null) realLocalAppsRef.current = localApps;
       setLocalApps(demoLocalApps(locale));
       return;
+    }
+    if (realLocalAppsRef.current !== null) {
+      setLocalApps(realLocalAppsRef.current);
+      realLocalAppsRef.current = null;
     }
     void refreshLocalApps();
     // Poll only while the tab is visible: a hidden desktop must not keep the
@@ -200,7 +255,17 @@ export function VibeDesktop() {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [refreshLocalApps, onboardingVisible, locale]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- capture real apps only when entering the tour
+  }, [refreshLocalApps, legacyTour, locale]);
+
+  useEffect(() => {
+    if (onboardingVisible) return;
+    const tick = () => { void automaticBackupTick().catch(() => undefined); };
+    tick();
+    const timer = window.setInterval(tick, 60_000);
+    document.addEventListener("visibilitychange", tick);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", tick); };
+  }, [payload?.desktop.id, onboardingVisible]);
 
   // Auto-capture each running local app's own icon (its favicon) and persist the
   // bytes so the icon survives even when the app stops. The browser can't fetch
@@ -246,20 +311,21 @@ export function VibeDesktop() {
   // example apps (not their real ones). Restore on dismiss.
   const realPayloadRef = useRef<DesktopPayload | null>(null);
   useEffect(() => {
-    if (onboardingVisible && payload && !realPayloadRef.current) {
+    if (legacyTour && payload && !realPayloadRef.current) {
       realPayloadRef.current = payload;
       setPayload(makeDemoPayload(payload, locale));
     }
-    if (!onboardingVisible && realPayloadRef.current) {
+    if (!legacyTour && realPayloadRef.current) {
       void refreshDesktop();
       realPayloadRef.current = null;
     }
-  }, [onboardingVisible, payload, locale]);
+    // refreshDesktop only calls state setters; re-running this on every render would add nothing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [legacyTour, payload, locale]);
 
   /* ----- boot ----- */
   useEffect(() => {
     void boot();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -294,8 +360,9 @@ export function VibeDesktop() {
       if (dragging) resetDraggedElement(dragging.element);
       dragRef.current = null;
       dragTargetRef.current = null;
+      const target = dragTargetElementRef.current;
+      if (target) delete target.dataset.active;
       setActiveDragAppId(null);
-      setDragTarget(null);
     }
     window.addEventListener("blur", clearStaleDrag);
     return () => window.removeEventListener("blur", clearStaleDrag);
@@ -334,10 +401,17 @@ export function VibeDesktop() {
     () => localApps.filter((v) => v.iconKind === "custom_local").map((v) => `app:local-app:${v.id}:icon`),
     [localApps]
   );
+  const localAssetKey = useMemo(
+    () => (payload ? localAssetHydrationKey(payload, localAppIconKeys) : ""),
+    [payload, localAppIconKeys]
+  );
   useEffect(() => {
     if (!payload) return;
     void hydrateLocalAssetsFromPayload(payload, localAppIconKeys);
-  }, [payload, localAppIconKeys]);
+    // App movement changes payload twice (optimistic + saved response), but it
+    // does not change the browser-local assets and must not remint the wallpaper.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localAssetKey]);
 
   useEffect(() => {
     writeLocalJson("vd:weather:city", weatherCity);
@@ -363,14 +437,36 @@ export function VibeDesktop() {
   }, [desktopHasWeather, loadWeather, weatherCity, t.weather.statusEnterCity]);
 
   useEffect(() => {
-    if (!payload?.desktop.startAppId) return;
+    if (!payload || !localAppsLoaded || sessionRestored || onboardingVisible) return;
+    // `?safe=1` boots without reopening the saved windows, a way out of any window that keeps failing.
+    const safeMode = new URLSearchParams(window.location.search).has("safe");
+    const saved = safeMode ? null : readLocalJson<unknown>(windowSessionKey, null);
+    if (localAppsError) pendingLocalSession.current = saved;
+    const restored = restoreWindows(saved, payload.desktop.id, displayApps, window.innerWidth, window.innerHeight);
     const startApp = payload.apps.find((app) => app.id === payload.desktop.startAppId);
-    if (!startApp) return;
-    const autoOpenKey = `${payload.desktop.id}:${startApp.id}`;
-    if (autoOpenedStartRef.current === autoOpenKey) return;
-    autoOpenedStartRef.current = autoOpenKey;
-    openApp(startApp);
-  }, [payload]); // openApp intentionally omitted — guarded by autoOpenedStartRef
+    setWindows(restored);
+    // Keep the existing start-app preference meaningful when restoring a session.
+    if (startApp && !restored.some(item => item.app.id === startApp.id)) openApp(startApp);
+    setSessionRestored(true);
+  }, [payload, localAppsLoaded, sessionRestored, onboardingVisible, displayApps, localAppsError]);
+
+  useEffect(() => {
+    if (!sessionRestored || !payload || localAppsError || onboardingVisible || !pendingLocalSession.current) return;
+    const localWindows = restoreWindows(pendingLocalSession.current, payload.desktop.id, displayApps, window.innerWidth, window.innerHeight)
+      .filter(item => item.app.id.startsWith("local-app:"));
+    pendingLocalSession.current = null;
+    if (localWindows.length) setWindows(current => [...current, ...localWindows.filter(item => !current.some(existing => existing.app.id === item.app.id))]);
+  }, [sessionRestored, payload, localAppsError, onboardingVisible, displayApps]);
+
+  useEffect(() => {
+    if (!sessionRestored || !payload || onboardingVisible) return;
+    const current = windowSession(payload.desktop.id, windows);
+    const previous = readLocalJson<ReturnType<typeof windowSession> | null>(windowSessionKey, null);
+    if (localAppsError && previous?.desktopId === current.desktopId && Array.isArray(previous.windows)) {
+      current.windows.push(...previous.windows.filter(item => typeof item?.appId === "string" && item.appId.startsWith("local-app:") && !current.windows.some(existing => existing.appId === item.appId)));
+    }
+    writeLocalJson(windowSessionKey, current);
+  }, [windows, payload, sessionRestored, onboardingVisible, localAppsError]);
 
   useEffect(() => {
     if (!user || !payload) return;
@@ -409,16 +505,20 @@ export function VibeDesktop() {
 
   /* ----- session ----- */
   async function boot() {
+    setLoading(true);
+    setBootError("");
     try {
+      await desktopData().describe();
       const currentUser = await desktopData().getUser();
       if (currentUser) {
         setUser(currentUser);
-        await refreshDesktop();
+        setPayload(await desktopData().loadDesktop());
       } else {
         setUser(null);
         setPayload(null);
       }
-    } catch {
+    } catch (error) {
+      setBootError(error instanceof DesktopDataError && error.code === "protocol_mismatch" ? "protocol_mismatch" : "unreachable");
       setUser(null);
       setPayload(null);
     } finally {
@@ -430,7 +530,9 @@ export function VibeDesktop() {
     try {
       setPayload(await desktopData().loadDesktop());
     } catch {
-      setPayload(null);
+      // Keep the desktop that is already on screen; a brief service hiccup is not a reason to blank it.
+      setTileNotice(locale === "zh" ? "暂时无法刷新桌面，稍后会自动重试。" : "Could not refresh the desktop right now; it will retry.");
+      window.setTimeout(() => setTileNotice(""), 5000);
     }
   }
 
@@ -440,28 +542,56 @@ export function VibeDesktop() {
   const hydratedAssetsRef = useRef<Record<string, string>>({});
   async function hydrateLocalAssetsFromPayload(nextPayload: DesktopPayload, localAppIconKeys: string[]) {
     const assets: Record<string, string> = {};
-    if (nextPayload.desktop.wallpaperKind === "custom_local") {
-      const wallpaper = await loadLocalAsset(`desktop:${nextPayload.desktop.id}:wallpaper`);
-      if (wallpaper) assets[`desktop:${nextPayload.desktop.id}:wallpaper`] = wallpaper;
-    }
+    let missingCustomWallpaper = false;
+    // IndexedDB can be blocked or fail per key; a missing image falls back, it never aborts the desktop.
+    const loadLocalAssetSafely = (key: string) => loadLocalAsset(key).catch(() => null);
+    const wallpaperKey = `desktop:${nextPayload.desktop.id}:wallpaper`;
+    const wallpaper = hydratedAssetsRef.current[wallpaperKey] ?? (await loadLocalAssetSafely(wallpaperKey));
+    if (wallpaper) assets[wallpaperKey] = wallpaper;
+    else if (nextPayload.desktop.wallpaperKind === "custom_local") missingCustomWallpaper = true;
     for (const app of nextPayload.apps) {
       if (app.iconKind !== "custom_local") continue;
-      const icon = await loadLocalAsset(`app:${app.id}:icon`);
-      if (icon) assets[`app:${app.id}:icon`] = icon;
+      const key = `app:${app.id}:icon`;
+      const icon = hydratedAssetsRef.current[key] ?? (await loadLocalAssetSafely(key));
+      if (icon) assets[key] = icon;
     }
     // Uploaded icons for daemon-managed local apps. The IndexedDB key mirrors the
     // virtual desktop-app id (`local-app:<daemonId>`) so desktop-canvas's existing
     // `localAssets[`app:${app.id}:icon`]` lookup finds them with no change.
     for (const key of localAppIconKeys) {
-      const icon = await loadLocalAsset(key);
+      const icon = hydratedAssetsRef.current[key] ?? (await loadLocalAssetSafely(key));
       if (icon) assets[key] = icon;
     }
     const kept = new Set(Object.values(assets));
-    Object.values(hydratedAssetsRef.current).forEach((url) => {
-      if (!kept.has(url)) URL.revokeObjectURL(url);
-    });
+    const staleUrls = Object.values(hydratedAssetsRef.current).filter((url) => !kept.has(url));
     hydratedAssetsRef.current = assets;
     setLocalAssets(assets);
+    // React may paint the previous state for one more frame. Revoking before
+    // that commit is exactly what produced the black wallpaper flash.
+    window.setTimeout(() => staleUrls.forEach((url) => URL.revokeObjectURL(url)), 1000);
+    if (missingCustomWallpaper) {
+      try {
+        const restored = await desktopData().updateDesktop({
+          wallpaperKind: "builtin",
+          wallpaperBuiltinId: "noir-dawn",
+          wallpaperFit: "cover"
+        });
+        setPayload(restored);
+        setTileNotice(t.dialogs.wallpaperMissingRestored);
+        window.setTimeout(() => setTileNotice(""), 5000);
+      } catch {
+        // Keep the built-in visual fallback even if persistence is temporarily unavailable.
+      }
+    }
+  }
+
+  function rememberLocalAsset(key: string, url: string): void {
+    const previous = hydratedAssetsRef.current[key];
+    hydratedAssetsRef.current = { ...hydratedAssetsRef.current, [key]: url };
+    setLocalAssets((current) => ({ ...current, [key]: url }));
+    if (previous && previous !== url) {
+      window.setTimeout(() => URL.revokeObjectURL(previous), 1000);
+    }
   }
 
   /* ----- window manager ----- */
@@ -469,16 +599,19 @@ export function VibeDesktop() {
     setContextMenu(null);
     startTransition(() => {
       setWindows((current) => {
-        const existing = current.find((windowState) => windowState.app.id === app.id);
-        const topZ = current.reduce((highest, item) => Math.max(highest, item.z), 10);
+        const prepared = current.map((item) =>
+          shellSurfacesConflict(app, item.app) ? { ...item, mode: "minimized" as const } : item
+        );
+        const existing = prepared.find((windowState) => windowState.app.id === app.id);
+        const topZ = prepared.reduce((highest, item) => Math.max(highest, item.z), 10);
         if (existing) {
-          return current.map((item) =>
+          return prepared.map((item) =>
             item.id === existing.id ? { ...item, z: topZ + 1, mode: "open" } : item
           );
         }
         const size = initialWindowSize(app);
         return [
-          ...current,
+          ...prepared,
           {
             id: crypto.randomUUID(),
             app,
@@ -520,28 +653,54 @@ export function VibeDesktop() {
     openApp(syntheticApp);
   }
 
+  function openCatalogTrial(input: { id: string; url: string; title: string; iconUrl: string }) {
+    // Official online trials are temporary windows: opening one must not add a
+    // desktop shortcut or alter the daemon-managed local application registry.
+    const syntheticApp: DesktopApp = {
+      id: `catalog-trial:${input.id}`,
+      desktopId: payload?.desktop.id ?? "",
+      kind: "url",
+      source: "directory",
+      title: input.title,
+      url: input.url,
+      description: null,
+      openingMode: "desktop_window",
+      iconKind: input.iconUrl ? "favicon" : "fallback",
+      iconUrl: input.iconUrl || null,
+      gridX: 0,
+      gridY: 0,
+      ...defaultTileFields,
+      sortOrder: 0,
+      metadata: { transientCatalogTrial: true },
+      createdAt: "",
+      updatedAt: ""
+    };
+    openApp(syntheticApp);
+  }
+
   async function controlLocalApp(id: string, action: "start" | "stop" | "restart") {
     try {
-      await desktopData().localApps.control(id, action);
-    } catch {
-      // daemon unreachable — the status poll will catch up
+      await runActivity(`${localApps.find(app => app.id === id)?.name || id} · ${action}`, async () => { await desktopData().localApps.control(id, action); await refreshLocalApps(); }, true);
+    } catch (error) {
+      setTileNotice(reasonFor(error) ?? (locale === "zh" ? "操作失败，请检查应用管理器后重试。" : "Action failed. Check the application manager and retry."));
+      return false;
     }
     await refreshLocalApps();
+    return true;
   }
 
   async function openLocalApp(view: LocalAppView) {
     if (!view.status.running) {
-      await controlLocalApp(view.id, "start");
+      if (!(await controlLocalApp(view.id, "start"))) return;
     }
     openUrlApp({ id: view.id, url: view.status.url, title: view.name });
   }
 
-  // Desktop gesture contract: a single click always opens inside Vibe Desktop.
-  // A double click is the explicit browser-tab shortcut, regardless of the
-  // legacy openingMode value stored on older app records.
+  // Single click respects the saved preference; double click explicitly opens a tab.
   function openInDesktop(app: DesktopApp) {
     const view = localAppViewById.get(app.id);
-    if (view) void openLocalApp(view);
+    if (app.openingMode === "external_tab" && app.url) openInBrowser(app);
+    else if (view) void openLocalApp(view);
     else openApp(app);
   }
 
@@ -665,7 +824,25 @@ export function VibeDesktop() {
       return;
     }
     dragTargetRef.current = nextTarget;
-    setDragTarget(nextTarget);
+    const element = dragTargetElementRef.current;
+    if (!element) return;
+    if (!nextTarget) {
+      delete element.dataset.active;
+      delete element.dataset.adjusted;
+      delete element.dataset.widget;
+      return;
+    }
+    const metrics = currentDesktopGridLayout().metrics;
+    const width = nextTarget.span.columns === 1 ? 88 : nextTarget.span.columns * metrics.cellWidth;
+    const height = nextTarget.span.rows === 1 ? 96 : nextTarget.span.rows * metrics.cellHeight;
+    const x = metrics.desktopInset + nextTarget.gridX * metrics.cellWidth;
+    const y = metrics.desktopInset + nextTarget.gridY * metrics.cellHeight;
+    element.style.width = `${width}px`;
+    element.style.height = `${height}px`;
+    element.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    element.dataset.active = "true";
+    element.dataset.adjusted = String(nextTarget.adjusted);
+    element.dataset.widget = String(nextTarget.span.columns > 1 || nextTarget.span.rows > 1);
   }
 
   function clearDragState(options: { keepTransformForFrame?: boolean } = {}) {
@@ -769,20 +946,103 @@ export function VibeDesktop() {
   }
 
   if (!user || !payload) {
-    return <BootScreen message={t.app.loading} />;
+    const bootMessage = bootError === "protocol_mismatch"
+      ? (locale === "zh" ? "桌面与本地服务版本不兼容，请使用同一发行版后重试。" : "Desktop and local service versions are incompatible. Use a matching release and retry.")
+      : bootError === "unreachable"
+        ? (locale === "zh" ? "无法连接桌面服务，请检查服务后重试。" : "Could not connect to the desktop service. Check the service and retry.")
+        : (locale === "zh" ? "桌面数据不可用。" : "Desktop data is unavailable.");
+    return <div className="boot-screen"><p role="alert">{bootMessage}</p><button onClick={() => void boot()}>{locale === "zh" ? "重试连接" : "Retry connection"}</button></div>;
   }
 
   const desktopStyle = resolveDesktopStyle(payload, localAssets[`desktop:${payload.desktop.id}:wallpaper`]);
 
+  const renderWindowContent = (windowState: AppWindowState) => (
+        <WindowErrorBoundary
+          key={windowState.id}
+          locale={locale}
+          title={displayAppTitle(windowState.app, t)}
+          onClose={() => closeWindow(windowState.id)}
+        >
+          <WindowContent
+            app={windowState.app}
+            locale={locale}
+            t={t}
+            weatherCity={weatherCity}
+            weather={weather}
+            weatherStatus={weatherStatus}
+            onWeatherCityChange={setWeatherCity}
+            onWeatherRefresh={() => loadWeather(weatherCity.trim())}
+            onAddDirectoryApp={async (id) => {
+              setPayload(await desktopData().addCatalogApp(id));
+            }}
+            onOpenCatalogTrial={openCatalogTrial}
+            onOpenLocalApps={() => {
+              const localAppsEntry = payload.apps.find(isLocalAppsApp);
+              if (localAppsEntry) openInDesktop(localAppsEntry);
+            }}
+            localApps={localApps}
+            onRefreshLocalApps={refreshLocalApps}
+            onControlLocalApp={async (id, action) => { if (!(await controlLocalApp(id, action))) throw new Error(locale === "zh" ? "操作失败，请查看任务通知。" : "Action failed; check Activity."); }}
+            onOpenUrlApp={openUrlApp}
+            payload={payload}
+            startPageUrl={startPageUrl}
+            canPromptInstall={Boolean(installPrompt)}
+            isStandalone={isStandalone}
+            onInstall={promptInstall}
+            onShowOnboarding={() => setOnboardingVisible(true)}
+            onLocaleChange={setLocale}
+            onPayloadUpdated={(nextPayload) => {
+              setPayload(nextPayload);
+              setWindows((current) =>
+                current.map((item) => {
+                  const updatedApp = nextPayload.apps.find((app) => app.id === item.app.id);
+                  return updatedApp ? { ...item, app: updatedApp } : item;
+                })
+              );
+            }}
+          />
+        </WindowErrorBoundary>
+  );
+  const packageCommands: DesktopShellCommands = {
+    open: id => { const app = displayApps.find(a => a.id === id); if (app) openInDesktop(app); },
+    external: id => { const app = displayApps.find(a => a.id === id); if (app) openInBrowser(app); },
+    focus: focusWindow,
+    patch: (id, patch) => patchWindow(id, normalizeWindowPatch(patch)),
+    close: id => {
+      const item = windows.find(w => w.id === id);
+      if (item?.app.id.startsWith("local-app:")) setCloseConfirm({ windowId: id, daemonId: item.app.id.slice(10), name: item.app.title });
+      else closeWindow(id);
+    },
+    addApp: () => setAddOpen(true),
+    editApp: id => { const app = displayApps.find(a => a.id === id); if (app) setEditingApp(app); },
+    removeApp: id => { const app = displayApps.find(a => a.id === id); if (app) void removeApp(app); },
+    arrangeApps: autoArrange,
+    moveApp: (id, x, y) => { const app = displayApps.find(a => a.id === id); if (!app || !Number.isSafeInteger(x) || !Number.isSafeInteger(y) || x < 0 || y < 0) return; if (isLocalApp(app)) saveLocalAppLayout(id, x, y); else void saveAppPosition(app, x, y); },
+    wallpaper: () => setWallpaperOpen(true),
+    managePackages: () => setPackageManagerOpen(true),
+    workspace: panel => { if (["windows", "scenes", "organize", "activity"].includes(panel)) setWorkspaceRequest({ panel }); },
+    notify: setTileNotice,
+  };
+
   return (
     <main
-      className={`${desktopStyle.className} ${activeDragAppId ? "is-dragging-desktop" : ""}`}
+      className={`${desktopStyle.className}${packageId !== "classic" ? " has-desktop-package" : ""}`}
       style={desktopStyle.style}
       {...desktopStyle.dataAttributes}
+      tabIndex={0}
+      aria-label={t.app.desktopAria}
       onClick={() => setContextMenu(null)}
       onContextMenu={(event) => {
         event.preventDefault();
+        event.currentTarget.focus({ preventScroll: true });
         setContextMenu({ kind: "desktop", x: event.clientX, y: event.clientY });
+      }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+        event.preventDefault();
+        const bounds = event.currentTarget.getBoundingClientRect();
+        setContextMenu({ kind: "desktop", x: bounds.left + 32, y: bounds.top + 88 });
       }}
       onPointerMove={(event) => {
         const dragging = dragRef.current;
@@ -849,16 +1109,32 @@ export function VibeDesktop() {
         if (!dragging || event.pointerId === dragging.pointerId) clearDragState();
       }}
     >
+      <CatalogActivity />
+      <ProductivityBar hiddenToolbar={packageId !== "classic"} request={workspaceRequest} apps={displayApps} payload={payload} windows={windows} t={t} zh={locale === "zh"}
+        onOpen={openInDesktop} onWindows={setWindows} onPayload={setPayload} onFilter={setFilteredIds}
+        onPrepareScene={async apps => {
+          for (const app of apps) {
+            const local = localAppViewById.get(app.id);
+            if (local && !local.status.running && !(await controlLocalApp(local.id, "start"))) throw new Error(locale === "zh" ? `无法启动 ${local.name}，请查看任务通知。` : `Could not start ${local.name}; check Activity.`);
+          }
+        }}
+        onCloseWindow={id => {
+          const item = windows.find(w => w.id === id);
+          if (item?.app.id.startsWith("local-app:")) setCloseConfirm({ windowId: id, daemonId: item.app.id.slice(10), name: item.app.title });
+          else closeWindow(id);
+        }} />
+
+      {packageId === "classic" ? <>
       <div className="desktop-brand">
         <span>Vibe Desktop</span>
         <strong>{t.app.personalWebDesktop}</strong>
       </div>
 
       <DesktopCanvas
-        apps={displayApps}
+        apps={filteredIds ? displayApps.filter(app => filteredIds.includes(app.id)) : displayApps}
         localAssets={localAssets}
         activeDragAppId={activeDragAppId}
-        dragTarget={dragTarget}
+        dragTargetElementRef={dragTargetElementRef}
         weatherCity={weatherCity}
         weather={weather}
         weatherStatus={weatherStatus}
@@ -929,7 +1205,7 @@ export function VibeDesktop() {
       {windows.map((windowState) => (
         <DesktopWindow
           key={windowState.id}
-          state={windowState}
+          state={{ ...windowState, z: windowStack.get(windowState.id) ?? 10 }}
           onFocus={() => focusWindow(windowState.id)}
           onPatch={(updates) => patchWindow(windowState.id, updates)}
           onClose={() => {
@@ -945,46 +1221,23 @@ export function VibeDesktop() {
           }}
           t={t}
         >
-          <WindowContent
-            app={windowState.app}
-            locale={locale}
-            t={t}
-            weatherCity={weatherCity}
-            weather={weather}
-            weatherStatus={weatherStatus}
-            onWeatherCityChange={setWeatherCity}
-            onWeatherRefresh={() => loadWeather(weatherCity.trim())}
-            onAddDirectoryApp={async (id) => {
-              setPayload(await desktopData().addCatalogApp(id));
-            }}
-            localApps={localApps}
-            onRefreshLocalApps={refreshLocalApps}
-            onControlLocalApp={controlLocalApp}
-            onOpenUrlApp={openUrlApp}
-            payload={payload}
-            startPageUrl={startPageUrl}
-            canPromptInstall={Boolean(installPrompt)}
-            isStandalone={isStandalone}
-            onInstall={promptInstall}
-            onShowOnboarding={() => setOnboardingVisible(true)}
-            onLocaleChange={setLocale}
-            onPayloadUpdated={(nextPayload) => {
-              setPayload(nextPayload);
-              setWindows((current) =>
-                current.map((item) => {
-                  const updatedApp = nextPayload.apps.find((app) => app.id === item.app.id);
-                  return updatedApp ? { ...item, app: updatedApp } : item;
-                })
-              );
-            }}
-          />
+          {renderWindowContent(windowState)}
         </DesktopWindow>
       ))}
 
-      {tileNotice ? (
-        <output className="tile-notice" role="status">
-          {tileNotice}
-        </output>
+
+      </> : <PackageShell packageId={packageId}
+        snapshot={{ desktopAppIds: filteredIds ?? undefined, apps: displayApps.map(app => ({ ...app, label: displayAppTitle(app, t), imageUrl: app.iconKind === "builtin" ? undefined : iconImageCandidates(app, localAssets[`app:${app.id}:icon`])[0], running: statusByApp[app.id] === "running" })), windows, locale, clock, userName: user.displayName || "Vibe", localService: !localAppsLoaded ? "checking" : localAppsError ? "unavailable" : "connected", wallpaper: payload.desktop.wallpaperKind === "custom_local" ? desktopStyle.style.backgroundImage as string : null }}
+        commands={packageCommands} renderWindow={id => { const state = windows.find(w => w.id === id); return state ? renderWindowContent(state) : null; }} />}
+      {packageManagerOpen ? <PackageManager selected={packageId} onSelect={selectPackage} onClose={() => setPackageManagerOpen(false)} /> : null}
+      {tileNotice || (localAppsError && packageId === "classic") ? (
+        <div className="tile-notice" role="alert">
+          <span>{tileNotice || (localAppsError === "daemon_unreachable" ? (locale === "zh" ? "暂时无法连接本地应用管理器。已保留最后的应用列表。" : "The local application manager is unreachable. Your last app list is preserved.") : localAppsError)}</span>{" "}
+          <button type="button" onClick={() => { setTileNotice(""); void refreshLocalApps(); }}>
+            {locale === "zh" ? "重试连接" : "Retry connection"}
+          </button>{" "}
+          {tileNotice ? <button type="button" onClick={() => setTileNotice("")}>{locale === "zh" ? "关闭" : "Dismiss"}</button> : null}
+        </div>
       ) : null}
 
       {contextMenu ? (
@@ -1019,6 +1272,7 @@ export function VibeDesktop() {
         />
       ) : null}
 
+      {packageId === "classic" ? <>
       <Dock
         user={user}
         clock={clock}
@@ -1064,8 +1318,10 @@ export function VibeDesktop() {
         <div className="apps-rail-handle" aria-hidden="true" />
       </div>
 
+      </> : null}
+
       {onboardingVisible ? (
-        <TourOverlay locale={locale} onDone={dismissOnboarding} />
+        packageId === "classic" ? <TourOverlay locale={locale} onDone={dismissOnboarding} /> : <DesktopOnboarding selected={packageId} onSelect={selectPackage} onDone={dismissOnboarding} />
       ) : null}
 
       {addOpen ? (
@@ -1075,7 +1331,7 @@ export function VibeDesktop() {
           onSaved={(next, localIcon) => {
             setPayload(next);
             if (localIcon) {
-              setLocalAssets((current) => ({ ...current, [`app:${localIcon.appId}:icon`]: localIcon.url }));
+              rememberLocalAsset(`app:${localIcon.appId}:icon`, localIcon.url);
             }
             setAddOpen(false);
           }}
@@ -1093,7 +1349,7 @@ export function VibeDesktop() {
           }}
           onLocalIcon={async (file) => {
             const url = await saveLocalAsset(`app:${editingApp.id}:icon`, file);
-            setLocalAssets((current) => ({ ...current, [`app:${editingApp.id}:icon`]: url }));
+            rememberLocalAsset(`app:${editingApp.id}:icon`, url);
           }}
         />
       ) : null}
@@ -1106,8 +1362,9 @@ export function VibeDesktop() {
           onSaved={(next) => setPayload(next)}
           onLocalWallpaper={async (file) => {
             const url = await saveLocalAsset(`desktop:${payload.desktop.id}:wallpaper`, file);
-            setLocalAssets((current) => ({ ...current, [`desktop:${payload.desktop.id}:wallpaper`]: url }));
+            rememberLocalAsset(`desktop:${payload.desktop.id}:wallpaper`, url);
           }}
+          localWallpaper={localAssets[`desktop:${payload.desktop.id}:wallpaper`]}
         />
       ) : null}
       {closeConfirm ? (

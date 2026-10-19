@@ -80,7 +80,67 @@ export interface I18nMessages {
     eyebrow: string;
     title: string;
     description: string;
+    sidebarLabel: string;
+    viewsLabel: string;
+    localOnly: string;
+    discover: string;
+    followingFeed: string;
+    searchLabel: string;
+    searchPlaceholder: string;
     add: string;
+    addedState: string;
+    installWorkspace: string;
+    installingWorkspace: string;
+    installedWorkspace: string;
+    healthUnknown: string;
+    serviceHealthy: string;
+    serviceStopped: string;
+    updateWorkspace: string;
+    uninstallWorkspace: string;
+    uninstallConfirm: (title: string) => string;
+    uninstallDone: (path: string) => string;
+    installFailed: string;
+    agentNeeded: string;
+    installStarted: (path: string) => string;
+    installDialogEyebrow: string;
+    installDialogTitle: (title: string) => string;
+    installDialogBody: string;
+    officialInstall: string;
+    officialInstallHint: string;
+    officialRecommended: string;
+    agentInstallHint: string;
+    closeInstallOptions: string;
+    agentInstall: string;
+    agentDialogEyebrow: string;
+    agentDialogTitle: (title: string) => string;
+    agentDialogBody: string;
+    agentWorkspace: string;
+    copyForAgent: string;
+    copiedForAgent: string;
+    agentCopyFailed: string;
+    agentInstructionFailed: string;
+    closeAgentInstruction: string;
+    manageLocal: string;
+    manageLocalHint: string;
+    selfHosted: string;
+    websiteShortcut: string;
+    defaultPort: (port: number) => string;
+    statsApps: string;
+    statsWebUis: string;
+    statsCategories: string;
+    statsTrials: string;
+    tryOnline: string;
+    quickOpen: string;
+    quickOpenHint: string;
+    followDeveloper: string;
+    following: string;
+    followedDeveloper: (developer: string) => string;
+    unfollowedDeveloper: (developer: string) => string;
+    followingUpdateTitle: string;
+    followingUpdateBody: (count: number) => string;
+    viewFollowing: string;
+    followingEmptyTitle: string;
+    followingEmptyBody: string;
     openImport: string;
     emptyTitle: string;
     emptyBody: string;
@@ -92,6 +152,14 @@ export interface I18nMessages {
       githubApps: string;
     };
     categoryIndex: string;
+    browseCategories: {
+      all: string;
+      technology: string;
+      creative: string;
+      daily: string;
+      finance: string;
+      other: string;
+    };
     repository: string;
     starsSnapshot: (count: string, date: string) => string;
     added: (title: string) => string;
@@ -338,6 +406,19 @@ export interface I18nMessages {
     changesSaveFailed: string;
     uploadWallpaper: string;
     wallpaperLocalOnly: string;
+    currentWallpaper: string;
+    builtinWallpapers: string;
+    customWallpaper: string;
+    chooseLocalImage: string;
+    wallpaperFileHint: string;
+    wallpaperFit: string;
+    wallpaperFits: Record<"cover" | "contain" | "stretch" | "center", string>;
+    restoreDefaultWallpaper: string;
+    wallpaperSaved: string;
+    wallpaperInvalid: string;
+    wallpaperTooLarge: string;
+    wallpaperSaveFailed: string;
+    wallpaperMissingRestored: string;
     untitledApp: string;
   };
   data: {
@@ -378,7 +459,7 @@ const en: I18nMessages = {
     tileSizeRejected: "That size does not fit here.",
     addApp: "Add App",
     autoArrange: "Auto Arrange",
-    changeWallpaper: "Change Wallpaper",
+    changeWallpaper: "Personalize",
     open: "Open",
     edit: "Edit",
     changeIcon: "Change Icon",
@@ -427,20 +508,88 @@ const en: I18nMessages = {
     eyebrow: "Quick-add catalog",
     title: "Application Catalog",
     description: "Browse websites and curated high-star GitHub applications by category.",
+    sidebarLabel: "Application catalog navigation",
+    viewsLabel: "Catalog views",
+    localOnly: "Local software center",
+    discover: "Discover",
+    followingFeed: "Following",
+    searchLabel: "Search catalog",
+    searchPlaceholder: "Search apps, developers, or technology",
     add: "Add",
+    addedState: "Added",
+    installWorkspace: "Install",
+    installingWorkspace: "Installing…",
+    installedWorkspace: "Installed",
+    healthUnknown: "Service status unknown",
+    serviceHealthy: "Running and healthy",
+    serviceStopped: "Stopped or unhealthy — inspect Local WebApps",
+    updateWorkspace: "Update",
+    uninstallWorkspace: "Uninstall",
+    uninstallConfirm: (title) => `Uninstall ${title}? Application data will be preserved.`,
+    uninstallDone: (path) => `Uninstalled. Application data was preserved at ${path}`,
+    installFailed: "Installation failed",
+    agentNeeded: "Agent fallback available",
+    installStarted: (path) => `Installing the full project in ${path}`,
+    installDialogEyebrow: "Installation method",
+    installDialogTitle: (title) => `Install ${title}`,
+    installDialogBody: "Choose how to install this app. The reviewed official method is recommended; you can also hand the bounded task to a local Agent.",
+    officialInstall: "Official installation",
+    officialInstallHint: "Use the reviewed, pinned installation recipe",
+    officialRecommended: "Recommended",
+    agentInstallHint: "Copy the repository, workspace, registration, and verification task",
+    closeInstallOptions: "Close installation methods",
+    agentInstall: "Ask local Agent",
+    agentDialogEyebrow: "Agent handoff",
+    agentDialogTitle: (title) => `Install ${title} with a local Agent`,
+    agentDialogBody: "Review and copy this bounded installation task. The Agent must preserve the trusted source, workspace boundary, managed registration, and health checks.",
+    agentWorkspace: "Workspace",
+    copyForAgent: "Copy for Agent",
+    copiedForAgent: "Copied",
+    agentCopyFailed: "Clipboard access was denied. Select the instruction and copy it manually.",
+    agentInstructionFailed: "Could not prepare the local Agent instruction.",
+    closeAgentInstruction: "Close Agent instruction",
+    manageLocal: "Find locally",
+    manageLocalHint: "Installed WebUIs and computer scan",
+    selfHosted: "Self-hosted WebUI",
+    websiteShortcut: "Web shortcut",
+    defaultPort: (port) => `Default :${port}`,
+    statsApps: "Catalog apps",
+    statsWebUis: "Local-ready WebUIs",
+    statsCategories: "Categories",
+    statsTrials: "Online trials",
+    tryOnline: "Try online",
+    quickOpen: "Quick open",
+    quickOpenHint: "Open the official online trial in a browser tab",
+    followDeveloper: "Follow",
+    following: "Following",
+    followedDeveloper: (developer) => `Following ${developer}. Their apps now appear in your local updates feed.`,
+    unfollowedDeveloper: (developer) => `Stopped following ${developer}.`,
+    followingUpdateTitle: "Updates from developers you follow",
+    followingUpdateBody: (count) => `${count} catalog ${count === 1 ? "app" : "apps"} are collected in your local feed.`,
+    viewFollowing: "View feed",
+    followingEmptyTitle: "Follow a developer to build your feed",
+    followingEmptyBody: "Open Discover and follow a GitHub developer. Their catalog apps will be collected here locally.",
     openImport: "Open WebUI Import",
     emptyTitle: "No apps in this category yet",
     emptyBody: "Switch categories or add any website from the desktop dock.",
-    directoryHint: "Single click opens inside Vibe Desktop. Double click opens the website in a browser tab.",
+    directoryHint: "Single click follows the app’s opening preference. Double click opens the website in a browser tab.",
     categoryCount: (count) => `${count}`,
     types: {
       all: "All",
       websites: "Websites",
-      githubApps: "GitHub apps"
+      githubApps: "WebUI projects"
     },
-    categoryIndex: "Categories",
+    categoryIndex: "Browse",
+    browseCategories: {
+      all: "All apps",
+      technology: "Technology",
+      creative: "Creative",
+      daily: "Everyday",
+      finance: "Finance",
+      other: "Other"
+    },
     repository: "GitHub",
-    starsSnapshot: (count, date) => `★ ${count} · snapshot ${date}`,
+    starsSnapshot: (count, date) => `${count} stars · snapshot ${date}`,
     added: (title) => `${title} added to the desktop.`,
     addFailed: "Could not add this application.",
     categories: {
@@ -686,7 +835,7 @@ const en: I18nMessages = {
   dialogs: {
     addAppTitle: "Add App",
     editAppTitle: "Edit App",
-    wallpaperTitle: "Change Wallpaper",
+    wallpaperTitle: "Personalization",
     close: "Close",
     cancel: "Cancel",
     appPreviewDescription: "A web app shortcut for your Vibe Desktop.",
@@ -717,7 +866,20 @@ const en: I18nMessages = {
     saving: "Saving...",
     changesSaveFailed: "Could not save changes.",
     uploadWallpaper: "Upload local wallpaper",
-    wallpaperLocalOnly: "Uploaded wallpapers stay in this browser for v1.",
+    wallpaperLocalOnly: "Your image stays in this browser's local storage and is never uploaded.",
+    currentWallpaper: "Desktop preview",
+    builtinWallpapers: "Built-in wallpapers",
+    customWallpaper: "My wallpaper",
+    chooseLocalImage: "Choose a local image",
+    wallpaperFileHint: "JPG, PNG, WebP, or AVIF · up to 20 MB",
+    wallpaperFit: "Picture fit",
+    wallpaperFits: { cover: "Fill", contain: "Fit", stretch: "Stretch", center: "Center" },
+    restoreDefaultWallpaper: "Restore default",
+    wallpaperSaved: "Wallpaper updated.",
+    wallpaperInvalid: "Choose a JPG, PNG, WebP, or AVIF image.",
+    wallpaperTooLarge: "This image is larger than 20 MB.",
+    wallpaperSaveFailed: "Could not save this wallpaper.",
+    wallpaperMissingRestored: "The local wallpaper is no longer available. The default wallpaper was restored.",
     untitledApp: "Untitled App"
   },
   data: {
@@ -866,7 +1028,7 @@ const zh: I18nMessages = {
     tileSizeRejected: "这个尺寸放不下。",
     addApp: "添加应用",
     autoArrange: "自动排列",
-    changeWallpaper: "更换壁纸",
+    changeWallpaper: "个性化",
     open: "打开",
     edit: "编辑",
     changeIcon: "更换图标",
@@ -915,20 +1077,88 @@ const zh: I18nMessages = {
     eyebrow: "快速添加目录",
     title: "应用目录",
     description: "按分类浏览网站与经过整理的 GitHub 高星应用。",
+    sidebarLabel: "应用目录导航",
+    viewsLabel: "目录视图",
+    localOnly: "本地软件中心",
+    discover: "发现",
+    followingFeed: "关注动态",
+    searchLabel: "搜索应用目录",
+    searchPlaceholder: "搜索应用、开发者或技术",
     add: "添加",
+    addedState: "已添加",
+    installWorkspace: "安装",
+    installingWorkspace: "正在安装…",
+    installedWorkspace: "已安装",
+    healthUnknown: "服务状态未知",
+    serviceHealthy: "运行正常",
+    serviceStopped: "已停止或异常，请在本地应用中检查",
+    updateWorkspace: "更新",
+    uninstallWorkspace: "卸载",
+    uninstallConfirm: (title) => `确定卸载 ${title}？应用数据会保留。`,
+    uninstallDone: (path) => `已卸载，应用数据保留在 ${path}`,
+    installFailed: "安装失败",
+    agentNeeded: "可交给 Agent 接管",
+    installStarted: (path) => `正在把完整项目安装到 ${path}`,
+    installDialogEyebrow: "选择安装方式",
+    installDialogTitle: (title) => `安装 ${title}`,
+    installDialogBody: "选择这次使用的安装方式。推荐使用经过审核的官方安装方案，也可以把受约束的安装任务交给本地 Agent。",
+    officialInstall: "官方安装",
+    officialInstallHint: "使用经过审核并固定版本的安装方案",
+    officialRecommended: "推荐",
+    agentInstallHint: "复制仓库、工作区、注册与验收任务",
+    closeInstallOptions: "关闭安装方式",
+    agentInstall: "让本地 Agent 安装",
+    agentDialogEyebrow: "交给本地 Agent",
+    agentDialogTitle: (title) => `让本地 Agent 安装 ${title}`,
+    agentDialogBody: "先审阅再复制这项受约束的安装任务；Agent 必须遵守审核源码、固定工作区、受管注册与健康验收边界。",
+    agentWorkspace: "工作区",
+    copyForAgent: "复制给 Agent",
+    copiedForAgent: "已复制",
+    agentCopyFailed: "浏览器未允许访问剪贴板，请选中指令后手动复制。",
+    agentInstructionFailed: "无法生成本地 Agent 安装指令。",
+    closeAgentInstruction: "关闭 Agent 安装指令",
+    manageLocal: "扫描本机",
+    manageLocalHint: "已安装 WebUI 与电脑扫描",
+    selfHosted: "可自托管 WebUI",
+    websiteShortcut: "网站快捷方式",
+    defaultPort: (port) => `默认 :${port}`,
+    statsApps: "目录应用",
+    statsWebUis: "可本地管理 WebUI",
+    statsCategories: "分类",
+    statsTrials: "在线试用",
+    tryOnline: "在线试用",
+    quickOpen: "快速打开",
+    quickOpenHint: "在浏览器标签页直接打开官方在线实例",
+    followDeveloper: "关注",
+    following: "已关注",
+    followedDeveloper: (developer) => `已关注 ${developer}，其应用会出现在本机关注动态中。`,
+    unfollowedDeveloper: (developer) => `已取消关注 ${developer}。`,
+    followingUpdateTitle: "你关注的开发者有应用可看",
+    followingUpdateBody: (count) => `已在本机关注动态中汇集 ${count} 个目录应用。`,
+    viewFollowing: "查看动态",
+    followingEmptyTitle: "关注开发者后，这里会形成你的动态流",
+    followingEmptyBody: "回到“发现”，在 GitHub 项目卡片上关注开发者；他们的目录应用会仅在本机汇集到这里。",
     openImport: "打开 WebUI 导入",
     emptyTitle: "这个分类还没有应用",
     emptyBody: "切换分类，或从桌面 Dock 添加任意网站。",
-    directoryHint: "单击在 Vibe Desktop 内打开，双击才在浏览器新标签页打开。",
+    directoryHint: "单击按应用设置的方式打开，双击在浏览器新标签页打开。",
     categoryCount: (count) => `${count}`,
     types: {
       all: "全部",
       websites: "网站",
-      githubApps: "GitHub 应用"
+      githubApps: "WebUI 项目"
     },
-    categoryIndex: "分类索引",
+    categoryIndex: "应用大类",
+    browseCategories: {
+      all: "全部应用",
+      technology: "科技",
+      creative: "创作",
+      daily: "日常",
+      finance: "金融",
+      other: "其他"
+    },
     repository: "GitHub",
-    starsSnapshot: (count, date) => `★ ${count} · ${date} 快照`,
+    starsSnapshot: (count, date) => `${count} 星 · ${date} 快照`,
     added: (title) => `已把 ${title} 添加到桌面。`,
     addFailed: "无法添加这个应用。",
     categories: {
@@ -1168,7 +1398,7 @@ const zh: I18nMessages = {
   dialogs: {
     addAppTitle: "添加应用",
     editAppTitle: "编辑应用",
-    wallpaperTitle: "更换壁纸",
+    wallpaperTitle: "个性化",
     close: "关闭",
     cancel: "取消",
     appPreviewDescription: "Vibe Desktop 的网页应用快捷方式。",
@@ -1199,7 +1429,20 @@ const zh: I18nMessages = {
     saving: "正在保存...",
     changesSaveFailed: "更改保存失败。",
     uploadWallpaper: "上传本地壁纸",
-    wallpaperLocalOnly: "上传的壁纸在 v1 中只保存在当前浏览器。",
+    wallpaperLocalOnly: "图片只保存在本机浏览器的专用存储中，不会上传。",
+    currentWallpaper: "桌面预览",
+    builtinWallpapers: "内置壁纸",
+    customWallpaper: "我的壁纸",
+    chooseLocalImage: "选择本地图片",
+    wallpaperFileHint: "支持 JPG、PNG、WebP、AVIF，最大 20 MB",
+    wallpaperFit: "图片适配",
+    wallpaperFits: { cover: "填充", contain: "适应", stretch: "拉伸", center: "居中" },
+    restoreDefaultWallpaper: "恢复默认",
+    wallpaperSaved: "壁纸已更新。",
+    wallpaperInvalid: "请选择 JPG、PNG、WebP 或 AVIF 图片。",
+    wallpaperTooLarge: "图片大小不能超过 20 MB。",
+    wallpaperSaveFailed: "无法保存这张壁纸。",
+    wallpaperMissingRestored: "本地壁纸已不存在，已恢复默认壁纸。",
     untitledApp: "未命名应用"
   },
   data: {
@@ -1351,7 +1594,13 @@ export function detectInitialLocale(): Locale {
     return "zh";
   }
 
-  const stored = normalizeLocale(window.localStorage.getItem(localeStorageKey));
+  let storedValue: string | null = null;
+  try {
+    storedValue = window.localStorage.getItem(localeStorageKey);
+  } catch {
+    // Storage blocked (privacy mode, site data disabled): fall back to the browser language.
+  }
+  const stored = normalizeLocale(storedValue);
 
   if (stored) {
     return stored;
@@ -1367,7 +1616,11 @@ export function persistLocale(locale: Locale): void {
     return;
   }
 
-  window.localStorage.setItem(localeStorageKey, locale);
+  try {
+    window.localStorage.setItem(localeStorageKey, locale);
+  } catch {
+    // Storage blocked or full; the choice still applies for this session.
+  }
 }
 
 export function intlLocale(locale: Locale): string {

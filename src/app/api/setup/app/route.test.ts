@@ -37,13 +37,21 @@ describe("GET /api/setup/app", () => {
   });
 
   it("exposes the documented CLI subcommands and the systemd unit name", () => {
-    const usage = "vibedesktop [open|status|start|stop|restart|logs|update|rollback|uninstall]";
+    const usage = "vibedesktop [open|status|start|stop|restart|logs|add <dir> [--plan|--start] [--name NAME]|scan|update|rollback|uninstall]";
     expect(installer).toContain(usage);
     expect(installer).toContain("vibedesktop-app.service");
     expect(installer).toContain("vibedesktop-run");
+    expect(installer).toContain("vibedesktop.desktop");
+    expect(installer).toContain('Exec=__EXEC__ open');
+    expect(installer).toContain('path.join(appRoot, "current", "public", "icon.svg")');
+    expect(installer).toContain('--desktop-path \\"$DESKTOP_PATH\\"');
     // Composition with vibed must use the canonical user-scoped CLI and always
     // refresh the matching runtime instead of preserving an older daemon.
-    expect(installer).toContain('VIBED_BIN="$HOME/.local/bin/vibed"');
+    expect(installer).toContain('case "${XDG_BIN_HOME:-}" in /*) BIN_HOME=$XDG_BIN_HOME ;; esac');
+    expect(installer).toContain('VIBED_BIN="$BIN_HOME/vibed"');
+    expect(installer).toContain('VIBE_DAEMON_RUNTIME_DIR=');
+    expect(installer).toContain('VIBE_DAEMON_CONFIG_DIR=');
+    expect(installer).toContain('VIBE_DAEMON_STATE_DIR=');
     expect(installer).toContain("Installing the matching vibed daemon");
     expect(installer).not.toContain('if [ ! -x "$VIBED_BIN" ]');
     expect(installer).toContain('VIBED_INSTALLER_URL="https://github.com/vimalinx/vibedesktop/releases/download/$TAG/install.sh"');
@@ -164,14 +172,23 @@ describe("GET /api/setup/app", () => {
 
       const unit = path.join(home, ".config", "systemd", "user", "vibedesktop-app.service");
       const unitText = await readFile(unit, "utf8");
-      expect(unitText).toContain("ExecStart=%h/.local/bin/vibedesktop-run");
+      expect(unitText).toContain(`ExecStart=${runCli}`);
       expect(unitText).toContain(`WorkingDirectory=${appCurrent}`);
-      expect(unitText).toContain(`VIBE_DATA_FILE=${path.join(home, ".local", "share", "vibedesktop-data", "vibedesktop.json")}`);
-      expect(unitText).toContain(`VIBE_DAEMON_DATA_DIR=${path.join(home, ".local", "share", "vibed-vibedesktop")}`);
+      expect(unitText).toContain(`VIBE_DATA_FILE=${path.join(home, ".local", "state", "vibedesktop", "vibedesktop.json")}`);
+      expect(unitText).toContain(`VIBE_DAEMON_CONFIG_DIR=${path.join(home, ".config", "vibed")}`);
+      expect(unitText).toContain(`VIBE_DAEMON_STATE_DIR=${path.join(home, ".local", "state", "vibed")}`);
+      expect(unitText).toContain(`VIBE_DAEMON_RUNTIME_DIR=${path.join(home, ".local", "state", "runtime", "vibed")}`);
       expect(unitText).not.toContain("vibedesktop-data/vibed-vibedesktop");
       expect(unitText).toContain("Wants=network-online.target vibedesktop-daemon.service");
       expect(unitText).toContain("VIBE_APP_PORT=43117");
       expect((await stat(unit)).mode & 0o777).toBe(0o600);
+
+      const desktopEntry = path.join(home, ".local", "share", "applications", "vibedesktop.desktop");
+      const desktopEntryText = await readFile(desktopEntry, "utf8");
+      expect(desktopEntryText).toContain(`Exec="${cli}" open`);
+      expect(desktopEntryText).toContain(`Icon=${path.join(appCurrent, "public", "icon.svg")}`);
+      expect(desktopEntryText).not.toContain(process.cwd());
+      expect((await stat(desktopEntry)).mode & 0o777).toBe(0o644);
     },
     600_000
   );

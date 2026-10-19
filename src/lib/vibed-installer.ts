@@ -51,7 +51,7 @@ export async function loadVibedInstallerFiles(projectRoot: string): Promise<Vibe
  * Builds the self-contained POSIX installer for `GET /api/setup/vibed`.
  *
  * Runtime and skill files are staged into a versioned, checksum-verified
- * directory (`versions/<versionId>/`) and switched into place atomically via
+ * directory (`releases/<versionId>/`) and switched into place atomically via
  * `daemon/release/version-store.mjs` — see design.md §§2-3. The generated CLI
  * wrapper gains `update`, `rollback`, `disable`, and `uninstall` (design.md
  * §§4-5). If no system Node 20+ is on PATH, a pure-`/bin/sh` preamble
@@ -68,7 +68,9 @@ export function buildVibedInstaller(files: VibedInstallerFiles, releasePublicKey
     "NODE=__NODE__",
     "RUNTIME_ROOT=__RUNTIME_ROOT__",
     'RUNTIME="$RUNTIME_ROOT/current"',
-    "DATA_DIR=__DATA_DIR__",
+    "CONFIG_DIR=__CONFIG_DIR__",
+    "STATE_DIR=__STATE_DIR__",
+    "ENDPOINT_DIR=__ENDPOINT_DIR__",
     "SKILL_ROOT_CLAUDE=__SKILL_ROOT_CLAUDE__",
     "SKILL_ROOT_CODEX=__SKILL_ROOT_CODEX__",
     "SKILL_ROOT_AGENTS=__SKILL_ROOT_AGENTS__",
@@ -77,7 +79,9 @@ export function buildVibedInstaller(files: VibedInstallerFiles, releasePublicKey
     "UNIT=vibedesktop-daemon.service",
     'if [ ! -x "$NODE" ]; then NODE=$(command -v node || true); fi',
     'if [ -z "$NODE" ]; then printf \'%s\\n\' \'Node.js 20 or newer is required.\' >&2; exit 1; fi',
-    'export VIBE_DAEMON_DATA_DIR="$DATA_DIR"',
+    'export VIBE_DAEMON_CONFIG_DIR="$CONFIG_DIR"',
+    'export VIBE_DAEMON_STATE_DIR="$STATE_DIR"',
+    'export VIBE_DAEMON_RUNTIME_DIR="$ENDPOINT_DIR"',
     'if [ -n "$RELEASE_PUBLIC_KEY" ]; then export VIBE_RELEASE_PUBLIC_KEY="$RELEASE_PUBLIC_KEY"; fi',
     'if [ "$#" -eq 0 ]; then COMMAND=status; else COMMAND=$1; shift; fi',
     'case "$COMMAND" in',
@@ -89,7 +93,7 @@ export function buildVibedInstaller(files: VibedInstallerFiles, releasePublicKey
     '  update) exec "$NODE" "$RUNTIME/daemon/release/lifecycle-update.mjs" --runtime-root "$RUNTIME_ROOT" --unit "$UNIT" --skill-root "$SKILL_ROOT_CLAUDE" --skill-root "$SKILL_ROOT_CODEX" --skill-root "$SKILL_ROOT_AGENTS" "$@" ;;',
     '  rollback) exec "$NODE" "$RUNTIME/daemon/release/lifecycle-update.mjs" --runtime-root "$RUNTIME_ROOT" --unit "$UNIT" --rollback "$@" ;;',
     '  disable) exec systemctl --user disable --now "$UNIT" ;;',
-    '  uninstall) exec "$NODE" "$RUNTIME/daemon/release/lifecycle-uninstall.mjs" --runtime-root "$RUNTIME_ROOT" --bin __VIBED_BIN__ --unit-path "$UNIT_PATH" --skill-root "$SKILL_ROOT_CLAUDE" --skill-root "$SKILL_ROOT_CODEX" --skill-root "$SKILL_ROOT_AGENTS" --unit "$UNIT" "$@" ;;',
+    '  uninstall) exec "$NODE" "$RUNTIME/daemon/release/lifecycle-uninstall.mjs" --runtime-root "$RUNTIME_ROOT" --bin __VIBED_BIN__ --unit-path "$UNIT_PATH" --config-dir "$CONFIG_DIR" --state-dir "$STATE_DIR" --endpoint-dir "$ENDPOINT_DIR" --unit "$UNIT" --skill-root "$SKILL_ROOT_CLAUDE" --skill-root "$SKILL_ROOT_CODEX" --skill-root "$SKILL_ROOT_AGENTS" "$@" ;;',
     "  *) printf '%s\\n' 'Usage: vibed [health|status|start|stop|restart|logs|update|rollback|disable|uninstall]' >&2; exit 2 ;;",
     "esac",
     ""
@@ -102,12 +106,14 @@ export function buildVibedInstaller(files: VibedInstallerFiles, releasePublicKey
     "",
     "[Service]",
     "Type=simple",
-    "ExecStart=%h/.local/bin/vibed run",
+    "ExecStart=__EXEC_START__ run",
     "Restart=on-failure",
     "RestartSec=3",
     "TimeoutStopSec=10",
     "Environment=NODE_ENV=production",
-    "Environment=__DATA_ENV__",
+    "Environment=__CONFIG_ENV__",
+    "Environment=__STATE_ENV__",
+    "Environment=__RUNTIME_ENV__",
     "Environment=__PATH_ENV__",
     "UMask=0077",
     "",
@@ -137,7 +143,7 @@ fi
 
 "$NODE" --input-type=module <<'VIBEDESKTOP_VIBED_INSTALLER'
 import { createHash, randomUUID } from "node:crypto";
-import { chmod, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, copyFile, cp, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -150,23 +156,32 @@ const generatedAt = ${JSON.stringify(manifest.generatedAt)};
 const home = homedir();
 const dataHome = absoluteXdg(process.env.XDG_DATA_HOME, path.join(home, ".local", "share"));
 const configHome = absoluteXdg(process.env.XDG_CONFIG_HOME, path.join(home, ".config"));
+const stateHome = absoluteXdg(process.env.XDG_STATE_HOME, path.join(home, ".local", "state"));
+const runtimeHome = absoluteXdg(process.env.XDG_RUNTIME_DIR, path.join(stateHome, "runtime"));
+const binHome = absoluteXdg(process.env.XDG_BIN_HOME, path.join(home, ".local", "bin"));
 const runtimeRoot = path.join(dataHome, "vibedesktop", "runtime");
-const versionsDir = path.join(runtimeRoot, "versions");
-const stateDir = path.join(dataHome, "vibed-vibedesktop");
+const releasesDir = path.join(runtimeRoot, "releases");
+const legacyDataDir = path.join(dataHome, "vibed-vibedesktop");
+const configDir = path.join(configHome, "vibed");
+const stateDir = path.join(stateHome, "vibed");
+const endpointDir = path.join(runtimeHome, "vibed");
 const skillRoots = [
   path.join(home, ".claude", "skills", "add_app"),
   path.join(home, ".codex", "skills", "add-app"),
   path.join(home, ".agents", "skills", "add-app"),
 ];
-const binDir = path.join(home, ".local", "bin");
+const binDir = binHome;
 const vibedBin = path.join(binDir, "vibed");
 const unitDir = path.join(configHome, "systemd", "user");
 const unitPath = path.join(unitDir, "vibedesktop-daemon.service");
 
-const finalVersionDir = path.join(versionsDir, versionId);
+await migrateLegacyReleases(runtimeRoot, releasesDir);
+await migrateLegacyDaemonData(legacyDataDir, configDir, stateDir);
+
+const finalVersionDir = path.join(releasesDir, versionId);
 if (!(await pathExists(finalVersionDir))) {
-  await ensureDirectory(versionsDir, 0o700);
-  const stagingDir = path.join(versionsDir, ".staging-" + process.pid + "-" + randomUUID());
+  await ensureDirectory(releasesDir, 0o700);
+  const stagingDir = path.join(releasesDir, ".staging-" + process.pid + "-" + randomUUID());
   try {
     await ensureDirectory(stagingDir, 0o700);
     for (const file of runtimeManifestFiles) {
@@ -220,7 +235,9 @@ await ensureDirectory(binDir, 0o755, false);
 const wrapper = ${JSON.stringify(wrapperTemplate, null, 2)}.map((line) => line
   .replaceAll("__NODE__", () => shellQuote(process.execPath))
   .replaceAll("__RUNTIME_ROOT__", () => shellQuote(runtimeRoot))
-  .replaceAll("__DATA_DIR__", () => shellQuote(stateDir))
+  .replaceAll("__CONFIG_DIR__", () => shellQuote(configDir))
+  .replaceAll("__STATE_DIR__", () => shellQuote(stateDir))
+  .replaceAll("__ENDPOINT_DIR__", () => shellQuote(endpointDir))
   .replaceAll("__SKILL_ROOT_CLAUDE__", () => shellQuote(skillRoots[0]))
   .replaceAll("__SKILL_ROOT_CODEX__", () => shellQuote(skillRoots[1]))
   .replaceAll("__SKILL_ROOT_AGENTS__", () => shellQuote(skillRoots[2]))
@@ -232,7 +249,10 @@ await writeAtomic(vibedBin, Buffer.from(wrapper), 0o700);
 
 await ensureDirectory(unitDir, 0o700, false);
 const service = ${JSON.stringify(serviceTemplate, null, 2)}.map((line) => line
-  .replaceAll("__DATA_ENV__", () => systemdQuote("VIBE_DAEMON_DATA_DIR=" + stateDir))
+  .replaceAll("__EXEC_START__", () => systemdQuote(vibedBin))
+  .replaceAll("__CONFIG_ENV__", () => systemdQuote("VIBE_DAEMON_CONFIG_DIR=" + configDir))
+  .replaceAll("__STATE_ENV__", () => systemdQuote("VIBE_DAEMON_STATE_DIR=" + stateDir))
+  .replaceAll("__RUNTIME_ENV__", () => systemdQuote("VIBE_DAEMON_RUNTIME_DIR=" + endpointDir))
   .replaceAll("__PATH_ENV__", () => systemdQuote("PATH=" + (process.env.PATH || "/usr/local/bin:/usr/bin:/bin"))))
   .join("\\n");
 await writeAtomic(unitPath, Buffer.from(service), 0o600);
@@ -259,6 +279,39 @@ async function pathExists(target) {
 async function ensureDirectory(directory, mode, repair = true) {
   await mkdir(directory, { recursive: true, mode });
   if (repair) await chmod(directory, mode);
+}
+
+async function migrateLegacyReleases(root, releases) {
+  const legacy = path.join(root, "versions");
+  if (!(await pathExists(releases)) && await pathExists(legacy)) await rename(legacy, releases);
+}
+
+async function migrateLegacyDaemonData(legacy, config, state) {
+  await ensureDirectory(config, 0o700);
+  await ensureDirectory(state, 0o700);
+  if (!(await pathExists(legacy))) return;
+  for (const name of ["daemon-config.json", "vibed-account.json", "vibed-credential.json", "vibed-identity.json"]) {
+    const source = path.join(legacy, name);
+    const target = path.join(config, name);
+    if (await pathExists(source) && !(await pathExists(target))) {
+      await copyFile(source, target);
+      await chmod(target, 0o600);
+    }
+  }
+  for (const name of ["vibed-command-cache.json", "vibed-projection-state.json"]) {
+    const source = path.join(legacy, name);
+    const target = path.join(state, name);
+    if (await pathExists(source) && !(await pathExists(target))) {
+      await copyFile(source, target);
+      await chmod(target, 0o600);
+    }
+  }
+  const legacyLogs = path.join(legacy, "logs");
+  const stateLogs = path.join(state, "logs");
+  if (await pathExists(legacyLogs) && !(await pathExists(stateLogs))) {
+    await cp(legacyLogs, stateLogs, { recursive: true, preserveTimestamps: true });
+    await chmod(stateLogs, 0o700);
+  }
 }
 
 async function writeManagedFile(root, relativePath, contents, mode) {
@@ -297,7 +350,9 @@ function systemdQuote(value) {
 }
 VIBEDESKTOP_VIBED_INSTALLER
 
-VIBED_BIN="$HOME/.local/bin/vibed"
+BIN_HOME=$HOME/.local/bin
+case "\${XDG_BIN_HOME:-}" in /*) BIN_HOME=$XDG_BIN_HOME ;; esac
+VIBED_BIN="$BIN_HOME/vibed"
 if [ "$#" -gt 0 ] && [ "$1" = "--install-only" ]; then
   printf '%s\n' 'VibeDesktop files installed. Service startup was skipped.'
   exit 0

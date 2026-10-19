@@ -4,8 +4,8 @@
  *
  * The installed runtime always invokes lifecycle scripts through
  * `${runtimeRoot}/current/...`, where `current` is a symlink into
- * `versions/<versionId>/...` (see `version-store.mjs`). Node resolves
- * `import.meta.url` through that symlink to the real `versions/...` path,
+ * `releases/<versionId>/...` (see `version-store.mjs`). Node resolves
+ * `import.meta.url` through that symlink to the real `releases/...` path,
  * while `process.argv[1]` stays the literal `current/...` invocation path —
  * so a naive `path.resolve(argv[1]) === fileURLToPath(import.meta.url)`
  * check is always false for any script invoked through `current`, silently

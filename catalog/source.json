@@ -28,6 +28,8 @@
     "language": "TypeScript",
     "license": "NOASSERTION",
     "verifiedAt": "2026-08-29",
+    "selfHosted": true,
+    "defaultPort": 5678,
     "noResolve": true
   },
   {
@@ -42,6 +44,8 @@
     "language": "TypeScript",
     "license": "NOASSERTION",
     "verifiedAt": "2026-08-29",
+    "selfHosted": true,
+    "defaultPort": 80,
     "noResolve": true
   },
   {
@@ -56,6 +60,8 @@
     "language": "Python",
     "license": "NOASSERTION",
     "verifiedAt": "2026-08-29",
+    "selfHosted": true,
+    "defaultPort": 8080,
     "noResolve": true
   },
   {
@@ -70,6 +76,8 @@
     "language": "TypeScript",
     "license": "MIT",
     "verifiedAt": "2026-08-29",
+    "selfHosted": true,
+    "defaultPort": 3000,
     "noResolve": true
   },
   {
@@ -84,6 +92,8 @@
     "language": "TypeScript",
     "license": "AGPL-3.0",
     "verifiedAt": "2026-08-29",
+    "selfHosted": true,
+    "defaultPort": 2283,
     "noResolve": true
   },
   {
@@ -98,6 +108,8 @@
     "language": "Java",
     "license": "NOASSERTION",
     "verifiedAt": "2026-08-29",
+    "selfHosted": true,
+    "defaultPort": 8080,
     "noResolve": true
   },
   {
@@ -112,6 +124,8 @@
     "language": "JavaScript",
     "license": "MIT",
     "verifiedAt": "2026-08-29",
+    "selfHosted": true,
+    "defaultPort": 3001,
     "noResolve": true
   },
   {
@@ -126,6 +140,8 @@
     "language": "JavaScript",
     "license": "MIT",
     "verifiedAt": "2026-08-29",
+    "selfHosted": true,
+    "defaultPort": 3001,
     "noResolve": true
   },
   {
@@ -140,6 +156,8 @@
     "language": "Go",
     "license": "MIT",
     "verifiedAt": "2026-08-29",
+    "selfHosted": true,
+    "defaultPort": 5230,
     "noResolve": true
   },
   {
@@ -154,6 +172,8 @@
     "language": "Clojure",
     "license": "MPL-2.0",
     "verifiedAt": "2026-08-29",
+    "selfHosted": true,
+    "defaultPort": 9001,
     "noResolve": true
   },
   {
@@ -168,6 +188,8 @@
     "language": "TypeScript",
     "license": "Apache-2.0",
     "verifiedAt": "2026-08-29",
+    "selfHosted": true,
+    "defaultPort": 80,
     "noResolve": true
   },
   {
@@ -182,6 +204,68 @@
     "language": "TypeScript",
     "license": "MIT",
     "verifiedAt": "2026-08-29",
+    "selfHosted": true,
+    "defaultPort": 5006,
+    "noResolve": true
+  },
+  {
+    "id": "github-flowise",
+    "url": "https://flowiseai.com",
+    "title": "Flowise",
+    "description": "Visual builder for AI agents, tools, and retrieval workflows.",
+    "category": "ai-platforms",
+    "catalogKind": "github_app",
+    "repositoryUrl": "https://github.com/FlowiseAI/Flowise",
+    "language": "TypeScript",
+    "license": "Apache-2.0",
+    "verifiedAt": "2026-08-31",
+    "selfHosted": true,
+    "defaultPort": 3000,
+    "noResolve": true
+  },
+  {
+    "id": "github-librechat",
+    "url": "https://www.librechat.ai",
+    "title": "LibreChat",
+    "description": "Multi-provider, self-hosted AI chat workspace with agents and tools.",
+    "category": "ai-platforms",
+    "catalogKind": "github_app",
+    "repositoryUrl": "https://github.com/danny-avila/LibreChat",
+    "language": "TypeScript",
+    "license": "MIT",
+    "verifiedAt": "2026-08-31",
+    "selfHosted": true,
+    "defaultPort": 3080,
+    "noResolve": true
+  },
+  {
+    "id": "github-comfyui",
+    "url": "https://www.comfy.org",
+    "title": "ComfyUI",
+    "description": "Node-based local interface for generative image, video, audio, and 3D workflows.",
+    "category": "media",
+    "catalogKind": "github_app",
+    "repositoryUrl": "https://github.com/Comfy-Org/ComfyUI",
+    "language": "Python",
+    "license": "GPL-3.0",
+    "verifiedAt": "2026-08-31",
+    "selfHosted": true,
+    "defaultPort": 8188,
+    "noResolve": true
+  },
+  {
+    "id": "github-chainlit",
+    "url": "https://chainlit.io",
+    "title": "Chainlit",
+    "description": "Python framework and WebUI for conversational AI applications.",
+    "category": "developer-tools",
+    "catalogKind": "github_app",
+    "repositoryUrl": "https://github.com/Chainlit/chainlit",
+    "language": "Python",
+    "license": "Apache-2.0",
+    "verifiedAt": "2026-08-31",
+    "selfHosted": true,
+    "defaultPort": 8000,
     "noResolve": true
   }
 ]

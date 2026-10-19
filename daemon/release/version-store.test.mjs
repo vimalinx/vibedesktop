@@ -96,7 +96,7 @@ describe("switchCurrent / LKG / prune", () => {
     expect(await readLastKnownGoodVersionId(runtimeRoot)).toBeNull();
 
     const linkTarget = await readlink(path.join(runtimeRoot, "current"));
-    expect(linkTarget).toBe(path.join("versions", v1.versionId));
+    expect(linkTarget).toBe(path.join("releases", v1.versionId));
     expect((await lstat(path.join(runtimeRoot, "current"))).isSymbolicLink()).toBe(true);
 
     const second = await switchCurrent(runtimeRoot, v2.versionId);

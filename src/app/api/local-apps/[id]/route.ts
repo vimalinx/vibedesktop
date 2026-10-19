@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { apiError, rejectCrossOriginMutation } from "@/lib/api-response";
+import { apiError, rejectCrossOriginMutation, invalidJsonBody, readJsonObject } from "@/lib/api-response";
 import { AuthRequiredError, requireCurrentUser } from "@/lib/auth";
-import { DaemonApiError, DaemonUnreachableError, deleteLocalApp, updateLocalApp } from "@/lib/daemon-client";
+import { DaemonApiError, DaemonTimeoutError, DaemonUnreachableError, deleteLocalApp, getLocalApp, updateLocalApp } from "@/lib/daemon-client";
+import { removeLocalAppBundle } from "@/lib/local-app-import";
 import type { IconKind } from "@/lib/contracts";
 
 export const runtime = "nodejs";
@@ -14,7 +15,6 @@ export async function GET(_request: Request, context: RouteContext) {
   try {
     await requireCurrentUser();
     const { id } = await context.params;
-    const { getLocalApp } = await import("@/lib/daemon-client");
     const app = await getLocalApp(id);
     return NextResponse.json({ app });
   } catch (error) {
@@ -28,7 +28,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     await requireCurrentUser();
     const { id } = await context.params;
-    const body = (await request.json()) as {
+    const body = (await readJsonObject(request)) as null | {
       name?: string;
       command?: string;
       args?: string[];
@@ -40,6 +40,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       iconKind?: IconKind;
       iconUrl?: string | null;
     };
+    if (!body) return invalidJsonBody();
 
     const app = await updateLocalApp(id, {
       ...(body.name !== undefined ? { name: body.name } : {}),
@@ -66,7 +67,10 @@ export async function DELETE(request: Request, context: RouteContext) {
   try {
     await requireCurrentUser();
     const { id } = await context.params;
+    const { command } = await getLocalApp(id);
     await deleteLocalApp(id);
+    // A project-imported app owns its generated run.sh bundle; re-importing regenerates it.
+    await removeLocalAppBundle(command).catch(() => false);
     return NextResponse.json({ deleted: id });
   } catch (error) {
     return handleError(error);
@@ -77,6 +81,7 @@ function handleError(error: unknown) {
   if (error instanceof AuthRequiredError) {
     return apiError(401, "auth_required", error.message);
   }
+  if (error instanceof DaemonTimeoutError) return apiError(504, "daemon_timeout", error.message);
   if (error instanceof DaemonUnreachableError) {
     return apiError(503, "daemon_unreachable", error.message);
   }

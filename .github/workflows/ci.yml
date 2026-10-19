@@ -11,17 +11,23 @@ permissions:
 jobs:
   gates:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
-      - run: npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org
+      - run: npm audit --audit-level=high --registry=https://registry.npmjs.org
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
       - run: npm run build
       - run: npm run catalog:build
       - run: npm run dist:generate

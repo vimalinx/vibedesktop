@@ -1,0 +1,11 @@
+{
+  "format": "vibedesktop-package",
+  "manifestVersion": 1,
+  "id": "org.example.classic-desktop",
+  "name": "Classic Desktop",
+  "version": "0.1.0",
+  "protocol": { "major": 1, "minMinor": 0 },
+  "requiredCapabilities": ["desktop", "packages.preferences"],
+  "optionalCapabilities": ["localApps", "system.metrics"],
+  "preferencesSchemaVersion": 1
+}

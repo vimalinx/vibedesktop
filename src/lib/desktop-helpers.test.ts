@@ -20,7 +20,9 @@ import {
   normalizeUrlForComparison,
   pointToGridPosition,
   restoredWindowDragOrigin,
+  shellSurfacesConflict,
   isLocalApp,
+  localAssetHydrationKey,
   localAppStatus,
   localAppToVirtualDesktopApps,
   wallpaperDrivesBackground,
@@ -54,6 +56,55 @@ function urlApp(overrides: Partial<DesktopApp> = {}): DesktopApp {
     ...overrides
   };
 }
+
+describe("localAssetHydrationKey", () => {
+  const desktop = {
+    id: "desktop-1",
+    userId: "user-1",
+    wallpaperKind: "custom_local" as const,
+    wallpaperBuiltinId: "noir-dawn",
+    wallpaperFit: "cover" as const,
+    startAppId: null,
+    themeId: "mineral" as const,
+    shellStyle: "glass" as const,
+    accentOverride: null,
+    fontOverride: null,
+    seedVersion: 1,
+    createdAt: "ts",
+    updatedAt: "ts"
+  };
+
+  it("does not change when an app only moves", () => {
+    const app = urlApp({ id: "custom-app", iconKind: "custom_local", gridX: 0, gridY: 0 });
+    const before = localAssetHydrationKey({ desktop, apps: [app] }, []);
+    const after = localAssetHydrationKey({ desktop, apps: [{ ...app, gridX: 7, gridY: 3 }] }, []);
+
+    expect(after).toBe(before);
+  });
+
+  it("changes when the required local icon set changes", () => {
+    const app = urlApp({ id: "custom-app", iconKind: "custom_local" });
+    const before = localAssetHydrationKey({ desktop, apps: [app] }, []);
+    const after = localAssetHydrationKey({ desktop, apps: [{ ...app, iconKind: "favicon" }] }, []);
+
+    expect(after).not.toBe(before);
+  });
+});
+
+describe("shellSurfacesConflict", () => {
+  const startBoard = urlApp({ kind: "builtin", title: "Start Board", iconUrl: "vd://icon/start-board" });
+  const localApps = urlApp({ kind: "builtin", title: "Local WebApps", iconUrl: "vd://icon/local-apps" });
+
+  it("makes the Start Board and Local WebApps manager mutually exclusive", () => {
+    expect(shellSurfacesConflict(startBoard, localApps)).toBe(true);
+    expect(shellSurfacesConflict(localApps, startBoard)).toBe(true);
+  });
+
+  it("does not minimize ordinary app windows", () => {
+    expect(shellSurfacesConflict(startBoard, urlApp({ id: "chat" }))).toBe(false);
+    expect(shellSurfacesConflict(localApps, urlApp({ id: "chat" }))).toBe(false);
+  });
+});
 
 describe("url helpers", () => {
   it("prepends https:// for bare domains and http:// for localhost", () => {
@@ -197,7 +248,7 @@ describe("window sizing + grid", () => {
       iconUrl: "vd://icon/start-board",
       url: null
     });
-    expect(initialWindowSize(localApps)).toEqual({ width: 780, height: 440 });
+    expect(initialWindowSize(localApps)).toEqual({ width: 960, height: 600 });
     expect(initialWindowSize(localApps).height).toBeLessThan(initialWindowSize(startBoard).height);
   });
 

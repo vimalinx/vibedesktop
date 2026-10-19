@@ -220,21 +220,21 @@ if (isMain) {
   const argv = process.argv.slice(2);
   const runtimeRoot = argValue(argv, "--runtime-root");
   const unit = argValue(argv, "--unit") || DEFAULT_UNIT;
-  const dataDir = process.env.VIBE_DAEMON_DATA_DIR;
+  const runtimeDir = process.env.VIBE_DAEMON_RUNTIME_DIR || process.env.VIBE_DAEMON_DATA_DIR;
   const skillRoots = argValues(argv, "--skill-root");
   const manifestUrl = argValue(argv, "--url") || process.env.VIBE_UPDATE_MANIFEST_URL || DEFAULT_UPDATE_MANIFEST_URL;
   const publicKeyBase64 = process.env.VIBE_RELEASE_PUBLIC_KEY || null;
 
-  if (!runtimeRoot || !dataDir) {
-    console.error("lifecycle-update requires --runtime-root and VIBE_DAEMON_DATA_DIR.");
+  if (!runtimeRoot || !runtimeDir) {
+    console.error("lifecycle-update requires --runtime-root and VIBE_DAEMON_RUNTIME_DIR.");
     process.exitCode = 2;
   } else {
     const restart = systemctlRestart(unit);
-    const checkHealth = () => checkVibedHealth({ dataDir });
+    const checkHealth = () => checkVibedHealth({ runtimeDir });
     const isRollbackCommand = argv.includes("--rollback");
     const operation = isRollbackCommand
       ? performRollback({ runtimeRoot, restart, checkHealth })
-      : performUpdate({ runtimeRoot, dataDir, skillRoots, manifestUrl, publicKeyBase64, restart, checkHealth });
+      : performUpdate({ runtimeRoot, dataDir: runtimeDir, skillRoots, manifestUrl, publicKeyBase64, restart, checkHealth });
 
     operation.then((result) => {
       if (result.status === "up_to_date") {

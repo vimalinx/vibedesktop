@@ -26,6 +26,7 @@ export function __setDesktopDataForTests(source: DesktopDataSource | null): void
 export { DesktopDataError, reasonFor } from "@/lib/desktop-data/contract";
 export type {
   CreateUrlAppInput,
+  CatalogInstallsCapability,
   DesktopAppPatch,
   DesktopDataSource,
   DesktopPatch,

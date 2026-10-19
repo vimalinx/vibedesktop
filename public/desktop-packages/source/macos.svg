@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0b174d"/><stop offset=".35" stop-color="#343a95"/><stop offset=".68" stop-color="#ba70a9"/><stop offset="1" stop-color="#f6a093"/></linearGradient>
+<linearGradient id="coral" x1="0" y1="0" x2=".8" y2=".8"><stop stop-color="#ffc3a3"/><stop offset=".32" stop-color="#fb8e91"/><stop offset=".7" stop-color="#ed5b82"/><stop offset="1" stop-color="#a92b64"/></linearGradient>
+<linearGradient id="rose" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f49dae"/><stop offset=".35" stop-color="#e24a79"/><stop offset=".75" stop-color="#a92869"/><stop offset="1" stop-color="#48175e"/></linearGradient>
+<linearGradient id="blue" x1="0" y1="0" x2="1" y2=".7"><stop stop-color="#6a65c3"/><stop offset=".3" stop-color="#274e9b"/><stop offset=".65" stop-color="#146497"/><stop offset="1" stop-color="#11a5b8"/></linearGradient>
+<linearGradient id="deep" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#161d55"/><stop offset=".55" stop-color="#174984"/><stop offset="1" stop-color="#08789b"/></linearGradient>
+<linearGradient id="light" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fbc6ba"/><stop offset="1" stop-color="#fc9191"/></linearGradient>
+<filter id="haze"><feGaussianBlur stdDeviation="50"/></filter>
+</defs>
+<rect width="1600" height="1000" fill="url(#sky)"/>
+<path d="M-100-100C286-28 235 119 421 196 654 292 730 400 702 570 671 760 594 842 620 1100H-100Z" fill="#10285d"/>
+<path d="M-90-80C181-5 208 205 494 260 690 298 792 357 753 514 711 686 611 789 749 1100H-100Z" fill="url(#coral)"/>
+<path d="M-60 38C231 109 116 271 364 342 614 414 658 468 621 591 565 778 612 943 750 1050H-100Z" fill="url(#rose)"/>
+<path d="M1167-80C1158 98 932 153 917 297 904 412 1079 469 1124 588 1187 755 1105 874 972 1040H1690V-80Z" fill="url(#light)"/>
+<path d="M1331-80C1308 70 1065 202 1048 327 1029 465 1187 474 1215 586 1251 729 1110 900 1132 1070H1710V-80Z" fill="url(#coral)"/>
+<path d="M1657 184C1456 246 1500 425 1356 480 1177 548 972 574 848 658 683 770 844 841 739 1000H1690Z" fill="url(#blue)"/>
+<path d="M1715 365C1555 407 1541 526 1421 576 1236 654 1121 618 1007 700 855 809 1011 882 933 1058H1690Z" fill="url(#deep)"/>
+<path d="M-80 735C90 647 194 824 379 790 579 753 677 783 720 913 742 979 791 1016 841 1052H-80Z" fill="#321a61"/>
+<path d="M-40 860C148 763 229 947 426 881 580 829 684 884 701 1023H-40Z" fill="#18254f"/>
+<ellipse cx="742" cy="416" rx="84" ry="180" fill="#e9b1d8" opacity=".2" filter="url(#haze)"/>
+</svg>

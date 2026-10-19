@@ -65,7 +65,10 @@ describe("vibed installer", () => {
     expect(installer).not.toContain(process.cwd());
 
     // Versioned layout: staging + digest verification + atomic switchCurrent, not a flat overwrite.
-    expect(installer).toContain("versions");
+    expect(installer).toContain("releases");
+    expect(installer).toContain("XDG_STATE_HOME");
+    expect(installer).toContain("XDG_RUNTIME_DIR");
+    expect(installer).toContain("XDG_BIN_HOME");
     expect(installer).toContain("switchCurrent");
     expect(installer).toContain("finalizeStagedDirectory");
     expect(installer).toContain("Digest mismatch while staging");

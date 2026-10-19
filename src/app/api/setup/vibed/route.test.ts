@@ -19,7 +19,18 @@ describe("GET /api/setup/vibed", () => {
     temporaryHomes.push(home);
     const dataHome = path.join(home, "data");
     const configHome = path.join(home, "config");
-    const isolatedEnv = { ...process.env, HOME: home, XDG_DATA_HOME: dataHome, XDG_CONFIG_HOME: configHome };
+    const stateHome = path.join(home, "state");
+    const runtimeHome = path.join(home, "runtime");
+    const binHome = path.join(home, "bin");
+    const isolatedEnv = {
+      ...process.env,
+      HOME: home,
+      XDG_DATA_HOME: dataHome,
+      XDG_CONFIG_HOME: configHome,
+      XDG_STATE_HOME: stateHome,
+      XDG_RUNTIME_DIR: runtimeHome,
+      XDG_BIN_HOME: binHome
+    };
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/x-shellscript");
@@ -37,13 +48,13 @@ describe("GET /api/setup/vibed", () => {
     const installedServer = path.join(currentLink, "daemon", "server.mjs");
     const installedSkill = path.join(home, ".claude", "skills", "add_app", "scan.py");
     const installedCodexManager = path.join(home, ".codex", "skills", "add-app", "manager.py");
-    const installedCli = path.join(home, ".local", "bin", "vibed");
+    const installedCli = path.join(binHome, "vibed");
     const installedUnit = path.join(configHome, "systemd", "user", "vibedesktop-daemon.service");
 
-    // Versioned layout: `current` is a relative symlink into `versions/<versionId>`,
+    // Versioned layout: `current` is a relative symlink into `releases/<versionId>`,
     // never a flat copy — this is what makes atomic update/rollback possible.
     const linkTarget = await readlink(currentLink);
-    expect(linkTarget.split(path.sep)[0]).toBe("versions");
+    expect(linkTarget.split(path.sep)[0]).toBe("releases");
     expect((await stat(currentLink)).isDirectory()).toBe(true);
 
     expect(await readFile(installedServer)).toEqual(await readFile(path.join(process.cwd(), "daemon", "server.mjs")));
@@ -66,7 +77,7 @@ describe("GET /api/setup/vibed", () => {
     child.stderr?.on("data", (chunk) => output.push(String(chunk)));
     const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
     try {
-      const health = await waitForHealth(path.join(dataHome, "vibed-vibedesktop"));
+      const health = await waitForHealth(path.join(runtimeHome, "vibed"));
       expect(health.ok).toBe(true);
       expect(execFileSync(installedCli, ["health"], { env: isolatedEnv, encoding: "utf8" })).toContain("vibed is healthy");
     } catch (error) {
@@ -85,19 +96,22 @@ describe("GET /api/setup/vibed", () => {
       env: isolatedEnv,
       encoding: "utf8"
     }).trim();
-    expect(resolvedState).toBe(path.join(dataHome, "vibed-vibedesktop"));
+    expect(resolvedState).toBe(path.join(runtimeHome, "vibed"));
 
     // Real `vibed uninstall` through the installed CLI wrapper (not the module
     // directly): removes managed files, keeps device identity/app config by
     // default, and requires the double-confirm flags to purge that state too.
-    const stateDir = path.join(dataHome, "vibed-vibedesktop");
+    const stateDir = path.join(stateHome, "vibed");
+    const daemonConfigDir = path.join(configHome, "vibed");
+    const endpointDir = path.join(runtimeHome, "vibed");
     execFileSync(installedCli, ["uninstall"], { env: isolatedEnv, encoding: "utf8" });
     await expect(stat(runtimeRoot)).rejects.toThrow();
     await expect(stat(installedCli)).rejects.toThrow();
     await expect(stat(installedUnit)).rejects.toThrow();
     await expect(stat(path.dirname(installedSkill))).rejects.toThrow();
     expect((await stat(stateDir)).isDirectory()).toBe(true);
-    expect((await readFile(path.join(stateDir, "daemon.token"), "utf8")).length).toBeGreaterThan(0);
+    expect((await stat(daemonConfigDir)).isDirectory()).toBe(true);
+    await expect(stat(endpointDir)).rejects.toThrow();
   });
 
   it("installs under set -eu with a real clean account where XDG_DATA_HOME/XDG_CONFIG_HOME are simply absent, not just empty", async () => {

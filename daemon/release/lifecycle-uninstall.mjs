@@ -2,8 +2,8 @@
 /**
  * `vibed uninstall` — removes only managed, reproducible files: the systemd
  * unit, the CLI wrapper, the versioned runtime tree, and the add_app skill.
- * It never removes `vibed-vibedesktop` (device identity, Runner credential,
- * app configuration) unless the caller passes both `--purge-data` and
+ * It never removes XDG config/state (device identity, Runner credential,
+ * app configuration and logs) unless the caller passes both `--purge-data` and
  * `--confirm-purge-data` — mirroring the existing double-flag pattern used by
  * `daemon:reset-device -- --confirm-reset-device`, so a single mistyped flag
  * can never delete local app configuration or device identity.
@@ -22,7 +22,8 @@ export const PURGE_CONFIRMATION_FLAG = "--confirm-purge-data";
 /**
  * @param {{
  *   runtimeRoot: string; cliPath: string; unitPath: string; skillRoot?: string; skillRoots?: string[];
- *   unit: string; dataDir?: string; purgeData?: boolean; confirmPurgeData?: boolean;
+ *   unit: string; dataDir?: string; configDir?: string; stateDir?: string; endpointDir?: string;
+ *   purgeData?: boolean; confirmPurgeData?: boolean;
  *   execFileImpl?: typeof execFileAsync;
  * }} options
  * @returns {Promise<{ removed: string[]; dataPurged: boolean }>}
@@ -50,16 +51,24 @@ export async function uninstallVibed(options) {
   await removeRuntimeTree(options.runtimeRoot);
   removed.push(options.runtimeRoot);
 
+  if (options.endpointDir) {
+    await rm(options.endpointDir, { recursive: true, force: true });
+    removed.push(options.endpointDir);
+  }
+
   const skillRoots = options.skillRoots || (options.skillRoot ? [options.skillRoot] : []);
   for (const skillRoot of skillRoots) {
     await rm(skillRoot, { recursive: true, force: true });
     removed.push(skillRoot);
   }
 
-  const dataPurged = Boolean(options.purgeData && options.confirmPurgeData && options.dataDir);
-  if (dataPurged && options.dataDir) {
-    await rm(options.dataDir, { recursive: true, force: true });
-    removed.push(options.dataDir);
+  const purgeTargets = [options.configDir, options.stateDir, options.dataDir].filter(Boolean);
+  const dataPurged = Boolean(options.purgeData && options.confirmPurgeData && purgeTargets.length > 0);
+  if (dataPurged) {
+    for (const target of new Set(purgeTargets)) {
+      await rm(target, { recursive: true, force: true });
+      removed.push(target);
+    }
   }
 
   return { removed, dataPurged };
@@ -114,6 +123,9 @@ if (isMain) {
   const skillRoots = argValues(argv, "--skill-root");
   const unit = argValue(argv, "--unit") || "vibedesktop-daemon.service";
   const dataDir = process.env.VIBE_DAEMON_DATA_DIR;
+  const configDir = argValue(argv, "--config-dir") || process.env.VIBE_DAEMON_CONFIG_DIR;
+  const stateDir = argValue(argv, "--state-dir") || process.env.VIBE_DAEMON_STATE_DIR;
+  const endpointDir = argValue(argv, "--endpoint-dir") || process.env.VIBE_DAEMON_RUNTIME_DIR;
 
   if (!runtimeRoot || !cliPath || !unitPath || skillRoots.length === 0) {
     console.error("lifecycle-uninstall requires --runtime-root, --bin, --unit-path, and --skill-root.");
@@ -126,6 +138,9 @@ if (isMain) {
       skillRoots,
       unit,
       dataDir,
+      configDir,
+      stateDir,
+      endpointDir,
       purgeData: argv.includes(PURGE_FLAG),
       confirmPurgeData: argv.includes(PURGE_CONFIRMATION_FLAG),
     }).then((result) => {

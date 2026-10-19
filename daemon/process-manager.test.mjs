@@ -25,6 +25,7 @@ function isAlive(pid) {
 // Stays alive, spawns a long-lived grandchild, prints its pid, then idles.
 const LAUNCHER = `const{spawn}=require("child_process");const c=spawn(process.execPath,["-e","setInterval(()=>{},60000)"],{stdio:"ignore"});console.log("GPID="+c.pid);setInterval(()=>{},1000);`;
 const HTTP_APP = `const http=require("http");const port=Number(process.argv[1]);http.createServer((_req,res)=>res.end("ok")).listen(port,"127.0.0.1",()=>console.log("READY"));setInterval(()=>{},1000);`;
+const HTTP_500_APP = `const http=require("http");const port=Number(process.argv[1]);http.createServer((_req,res)=>{res.statusCode=500;res.end("broken")}).listen(port,"127.0.0.1",()=>console.log("READY"));setInterval(()=>{},1000);`;
 const CRASHING_APP = `console.error("INTENTIONAL_CRASH");setTimeout(()=>process.exit(7),25);`;
 
 describe("ProcessManager — process-group teardown", () => {
@@ -73,6 +74,25 @@ describe("ProcessManager — process-group teardown", () => {
 });
 
 describe("ProcessManager — serialized local control", () => {
+  it("does not mark an HTTP 500 response healthy", async () => {
+    const manager = new ProcessManager();
+    const port = await findUnusedPort();
+    const cfg = {
+      id: "http-500-app", name: "HTTP 500 fixture", command: process.execPath,
+      args: ["-e", HTTP_500_APP, String(port)], cwd: undefined, port, env: {},
+      autoStart: false, createdAt: "ts", updatedAt: "ts"
+    };
+    try {
+      await manager.start(cfg);
+      await waitFor(async () => (await manager.getLogs(cfg.id)).some((line) => line.includes("READY")));
+      await manager._probeHealth();
+      expect(manager.withStatus(cfg)).toMatchObject({ running: true, healthy: false });
+    } finally {
+      await manager.stopAll();
+      manager.stopHealthMonitor();
+    }
+  });
+
   it("runs one process for duplicate starts and reports health, logs, restart, and stop", async () => {
     const manager = new ProcessManager();
     const port = await findUnusedPort();

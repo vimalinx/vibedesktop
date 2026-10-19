@@ -48,7 +48,8 @@ describe("parseCatalogArtifact — whitelist projection", () => {
           cwd: "/home/someone",
           port: 8080,
           env: { TOKEN: "secret" },
-          preload: "./evil.js"
+          preload: "./evil.js",
+          trialUrl: "https://frame-me.example"
         })
       ])
     );
@@ -67,6 +68,7 @@ describe("parseCatalogArtifact — whitelist projection", () => {
     for (const key of ["command", "args", "cwd", "port", "env", "preload"]) {
       expect(entry).not.toHaveProperty(key);
     }
+    expect(entry).not.toHaveProperty("trialUrl");
   });
 
   it("forces external_tab even when the entry asks to be framed into the desktop", () => {
@@ -83,6 +85,8 @@ describe("parseCatalogArtifact — whitelist projection", () => {
       language: "TypeScript",
       license: "MIT",
       verifiedAt: "2026-08-29",
+      selfHosted: true,
+      defaultPort: 8080,
       command: "npm run dev"
     })]));
 
@@ -92,9 +96,18 @@ describe("parseCatalogArtifact — whitelist projection", () => {
       stars: 12345,
       language: "TypeScript",
       license: "MIT",
-      verifiedAt: "2026-08-29"
+      verifiedAt: "2026-08-29",
+      selfHosted: true,
+      defaultPort: 8080
     });
     expect(entry).not.toHaveProperty("command");
+  });
+
+  it.each([0, 65536, -1, 3.14, "8080"])("drops an invalid informational default port: %s", (defaultPort) => {
+    const [entry] = parseCatalogArtifact(artifact([validEntry({ defaultPort, selfHosted: true })]));
+
+    expect(entry).toMatchObject({ selfHosted: true });
+    expect(entry).not.toHaveProperty("defaultPort");
   });
 
   it.each([

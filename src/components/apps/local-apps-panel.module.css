@@ -805,3 +805,12 @@
     border-top: 1px solid var(--border-hairline);
   }
 }
+
+/* The classic shell is a dark canvas: map the panel palette onto its canvas tokens. */
+.fakePanel:global(.local-apps-panel) {
+  --la-surface: var(--surface-canvas);
+  --la-surface-2: var(--highlight-soft);
+  --la-ink: var(--text-on-canvas);
+  --la-muted: var(--text-on-canvas-muted);
+  --la-line: var(--border-hairline);
+}

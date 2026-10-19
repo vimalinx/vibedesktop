@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { DesktopApp } from "@/lib/contracts";
+import { activity } from "@/lib/desktop-activity";
 import { desktopData } from "@/lib/desktop-data";
 import {
   displayAppTitle,
@@ -61,6 +62,8 @@ export function EmbeddedWebAppFrame({
   const urlMetadata = source.urlMetadata;
   const [status, setStatus] = useState<EmbedStatus>({ kind: "checking" });
   const [retries, setRetries] = useState(0);
+  const [attempt, setAttempt] = useState(0);
+  const [diagnostic, setDiagnostic] = useState("");
   const [iframeKey, setIframeKey] = useState(0);
   const [bridgeState, setBridgeState] = useState<EmbedBridgeState>(currentEmbedBridgeState);
   const zoomKey = `vd:zoom:${app.id}`;
@@ -83,11 +86,19 @@ export function EmbeddedWebAppFrame({
     writeLocalJson(zoomKey, zoom);
   }, [zoom, zoomKey]);
 
+  useEffect(() => {
+    const detail = status.kind === "blocked" ? status.message : status.kind === "ready" ? "页面已加载 / Page loaded" : status.kind === "starting" ? "等待服务响应 / Waiting for service" : status.kind === "checking" ? "检查打开方式 / Checking compatibility" : "加载页面 / Loading page";
+    activity(`${app.title} · ${t.embed.loading}`, status.kind === "blocked" ? "error" : status.kind === "ready" ? "success" : "running", detail, `embed:${app.id}`);
+  }, [app.id, app.title, status, t.embed.loading]);
+
   function adjustZoom(delta: number) {
     setZoom((current) => Math.min(1.75, Math.max(0.5, Math.round((current + delta) * 100) / 100)));
   }
 
   const isLoopback = isLoopbackUrl(app.url ?? "");
+  // Companion discovery is irrelevant to loopback apps. Its delayed result must
+  // not tear down a frame that has already loaded and may contain unsaved work.
+  const effectiveBridgeState = isLoopback ? "unavailable" : bridgeState;
 
   useEffect(() => {
     if (!app.url) return;
@@ -110,11 +121,7 @@ export function EmbeddedWebAppFrame({
           if (daemonId) {
             up = (await localApps.get(daemonId)).status.healthy;
           } else {
-            const ctrl = new AbortController();
-            const to = setTimeout(() => ctrl.abort(), 1500);
-            await fetch(url, { mode: "no-cors", signal: ctrl.signal });
-            clearTimeout(to);
-            up = true;
+            up = await source.localProbe.probe(url) === "found";
           }
         } catch {
           up = false;
@@ -134,6 +141,8 @@ export function EmbeddedWebAppFrame({
               if (!cancelled && verdict === false) {
                 setStatus({ kind: "blocked", message: t.embed.cannotEmbed });
               }
+            }).catch(() => {
+              // The check is advisory; the frame's own load timeout still decides.
             });
           }
           return;
@@ -156,13 +165,13 @@ export function EmbeddedWebAppFrame({
     // response-header rule before declaring itself ready. In that environment
     // mount the original site directly so its origin, cookies, storage and
     // sign-in session all remain intact.
-    if (bridgeState === "checking") {
+    if (effectiveBridgeState === "checking") {
       setStatus({ kind: "checking" });
       return () => {
         cancelled = true;
       };
     }
-    if (bridgeState === "ready") {
+    if (effectiveBridgeState === "ready") {
       setStatus({ kind: "loading_frame" });
       return () => {
         cancelled = true;
@@ -191,7 +200,7 @@ export function EmbeddedWebAppFrame({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- localApps/urlMetadata are stable module singletons
-  }, [app.id, app.url, bridgeState, isLoopback, t.embed.cannotEmbed, t.embed.checkCouldNotRun, t.embed.checkFailed, t.embed.loadTimeout]);
+  }, [attempt, app.id, app.url, effectiveBridgeState, isLoopback, t.embed.cannotEmbed, t.embed.checkCouldNotRun, t.embed.checkFailed, t.embed.loadTimeout]);
 
   useEffect(() => {
     if (status.kind !== "loading_frame") return;
@@ -282,11 +291,18 @@ export function EmbeddedWebAppFrame({
           </p>
           {status.kind === "blocked" ? (
             <div>
+              <button onClick={() => { setDiagnostic(""); setRetries(0); setAttempt(value => value + 1); }}>
+                {t.window.close === "关闭" ? "重新连接" : "Reconnect"}
+              </button>
+              {app.id.startsWith("local-app:") ? <button onClick={() => {
+                void localApps.logs(app.id.slice("local-app:".length)).then(lines => setDiagnostic(lines.slice(-30).join("\n") || (t.window.close === "关闭" ? "暂无日志" : "No logs yet"))).catch(() => setDiagnostic(t.window.close === "关闭" ? "暂时无法读取日志，本地服务可能未运行。" : "Logs are unavailable right now; the local service may not be running."));
+              }}>{t.window.close === "关闭" ? "查看启动日志" : "View startup logs"}</button> : null}
               <button className="primary-action" onClick={() => openExternalUrl(appUrl)}>
                 {t.embed.openExternal}
               </button>
             </div>
           ) : null}
+          {diagnostic ? <pre className="version-notes" role="status">{diagnostic}</pre> : null}
         </div>
       ) : null}
     </div>

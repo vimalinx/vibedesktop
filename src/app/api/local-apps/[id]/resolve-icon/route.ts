@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { apiError, rejectCrossOriginMutation } from "@/lib/api-response";
 import { AuthRequiredError, requireCurrentUser } from "@/lib/auth";
-import { DaemonApiError, DaemonUnreachableError, getLocalApp } from "@/lib/daemon-client";
+import { DaemonApiError, DaemonTimeoutError, DaemonUnreachableError, getLocalApp } from "@/lib/daemon-client";
 import { extractMetadataFromHtml } from "@/lib/metadata-resolver";
 
 export const runtime = "nodejs";
@@ -64,6 +64,7 @@ export async function POST(request: Request, context: RouteContext) {
     if (error instanceof AuthRequiredError) {
       return apiError(401, "auth_required", error.message);
     }
+    if (error instanceof DaemonTimeoutError) return apiError(504, "daemon_timeout", error.message);
     if (error instanceof DaemonUnreachableError) {
       return apiError(503, "daemon_unreachable", error.message);
     }

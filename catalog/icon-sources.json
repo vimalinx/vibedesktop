@@ -1,0 +1,150 @@
+[
+  {
+    "id": "chatgpt",
+    "fileName": "chatgpt.svg",
+    "sourceUrl": "https://raw.githubusercontent.com/aryan877/trialrun/main/docs/assets/logos/openai.svg",
+    "officialPage": "https://openai.com/brand/",
+    "note": "Exact OpenAI Blossom mirror; the ChatGPT origin blocks unattended downloads."
+  },
+  {
+    "id": "claude",
+    "fileName": "claude.svg",
+    "sourceUrl": "https://claude.ai/favicon.svg",
+    "officialPage": "https://claude.ai"
+  },
+  {
+    "id": "deepseek",
+    "fileName": "deepseek.svg",
+    "sourceUrl": "https://fe-static.deepseek.com/chat/favicon.svg",
+    "officialPage": "https://chat.deepseek.com"
+  },
+  {
+    "id": "kimi",
+    "fileName": "kimi.png",
+    "sourceUrl": "https://www.kimi.com/pwa-192.png",
+    "officialPage": "https://www.kimi.com"
+  },
+  {
+    "id": "doubao",
+    "fileName": "doubao.png",
+    "sourceUrl": "https://lf-flow-web-cdn.doubao.com/obj/flow-doubao/favicon/new-doubao/128x128.png",
+    "officialPage": "https://www.doubao.com"
+  },
+  {
+    "id": "qwen",
+    "fileName": "qwen.png",
+    "sourceUrl": "https://assets.alicdn.com/g/qwenweb/qwen-chat-fe/0.2.89/favicon.png",
+    "officialPage": "https://chat.qwen.ai"
+  },
+  {
+    "id": "yuanbao",
+    "fileName": "yuanbao.png",
+    "sourceUrl": "https://static.yuanbao.tencent.com/m/yuanbao-web/favicon_new@32.png",
+    "officialPage": "https://yuanbao.tencent.com"
+  },
+  {
+    "id": "wenxin",
+    "fileName": "wenxin.png",
+    "sourceUrl": "https://wenxin.baidu.com/apple-touch-icon.png",
+    "fallbackSourceUrls": [
+      "https://psstatic.cdn.bcebos.com/aife/image/baidu_ai_logo_1736910930000.png"
+    ],
+    "officialPage": "https://wenxin.baidu.com"
+  },
+  {
+    "id": "github-n8n",
+    "fileName": "n8n.png",
+    "sourceUrl": "https://n8n.io/apple-touch-icon.png",
+    "officialPage": "https://github.com/n8n-io/n8n"
+  },
+  {
+    "id": "github-dify",
+    "fileName": "dify.svg",
+    "sourceUrl": "https://dify.ai/favicon.svg",
+    "officialPage": "https://github.com/langgenius/dify"
+  },
+  {
+    "id": "github-open-webui",
+    "fileName": "open-webui.png",
+    "sourceUrl": "https://openwebui.com/favicon.png",
+    "officialPage": "https://github.com/open-webui/open-webui"
+  },
+  {
+    "id": "github-excalidraw",
+    "fileName": "excalidraw.png",
+    "sourceUrl": "https://excalidraw.com/apple-touch-icon.png",
+    "officialPage": "https://github.com/excalidraw/excalidraw"
+  },
+  {
+    "id": "github-immich",
+    "fileName": "immich.svg",
+    "sourceUrl": "https://raw.githubusercontent.com/immich-app/immich/main/design/immich-logo.svg",
+    "officialPage": "https://github.com/immich-app/immich"
+  },
+  {
+    "id": "github-stirling-pdf",
+    "fileName": "stirling-pdf.png",
+    "sourceUrl": "https://framerusercontent.com/images/4Q5tlRJijroUIAT4pCxhwmdSiQ.png",
+    "officialPage": "https://github.com/Stirling-Tools/Stirling-PDF"
+  },
+  {
+    "id": "github-uptime-kuma",
+    "fileName": "uptime-kuma.svg",
+    "sourceUrl": "https://uptime.kuma.pet/img/icon.svg",
+    "officialPage": "https://github.com/louislam/uptime-kuma"
+  },
+  {
+    "id": "github-anything-llm",
+    "fileName": "anything-llm.png",
+    "sourceUrl": "https://anythingllm.com/icon.png?0a59f488e9ddf54c",
+    "officialPage": "https://github.com/Mintplex-Labs/anything-llm"
+  },
+  {
+    "id": "github-memos",
+    "fileName": "memos.png",
+    "sourceUrl": "https://usememos.com/logo-rounded.png",
+    "officialPage": "https://github.com/usememos/memos"
+  },
+  {
+    "id": "github-penpot",
+    "fileName": "penpot.ico",
+    "sourceUrl": "https://penpot.app/favicon.ico",
+    "officialPage": "https://github.com/penpot/penpot"
+  },
+  {
+    "id": "github-appsmith",
+    "fileName": "appsmith.png",
+    "sourceUrl": "https://www.appsmith.com/favicon.png",
+    "officialPage": "https://github.com/appsmithorg/appsmith"
+  },
+  {
+    "id": "github-actual-budget",
+    "fileName": "actual-budget.ico",
+    "sourceUrl": "https://actualbudget.org/img/favicon.ico",
+    "officialPage": "https://github.com/actualbudget/actual"
+  },
+  {
+    "id": "github-flowise",
+    "fileName": "flowise.ico",
+    "sourceUrl": "https://flowiseai.com/favicon.ico",
+    "officialPage": "https://github.com/FlowiseAI/Flowise"
+  },
+  {
+    "id": "github-librechat",
+    "fileName": "librechat.png",
+    "sourceUrl": "https://www.librechat.ai/apple-touch-icon.png",
+    "officialPage": "https://github.com/danny-avila/LibreChat"
+  },
+  {
+    "id": "github-comfyui",
+    "fileName": "comfyui.svg",
+    "sourceUrl": "https://comfy.org/favicon.svg",
+    "officialPage": "https://github.com/Comfy-Org/ComfyUI"
+  },
+  {
+    "id": "github-chainlit",
+    "fileName": "chainlit.svg",
+    "sourceUrl": "https://framerusercontent.com/images/w5VVBA9nZIkquG4qZ6055QGm4e8.svg",
+    "officialPage": "https://github.com/Chainlit/chainlit"
+  }
+]

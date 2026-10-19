@@ -23,6 +23,7 @@ import { fileURLToPath } from "node:url";
 import { catalogFormatVersion, defaultCatalogCategory, parseCatalogArtifact } from "../src/lib/catalog-contract";
 import { resolveUrlMetadata } from "../src/lib/metadata-resolver";
 import { assertPublicHttpUrl, parseHttpUrl } from "../src/lib/url-safety";
+import { catalogIconDataUrl, catalogIconFileName } from "../src/lib/catalog-icons";
 
 /** An icon large enough to be a hero image is not an icon. */
 const maxIconBytes = 64_000;
@@ -40,6 +41,8 @@ interface SourceEntry {
   language?: string;
   license?: string;
   verifiedAt?: string;
+  selfHosted?: boolean;
+  defaultPort?: number;
   /** Skip network resolution and emit exactly what is written here. */
   noResolve?: boolean;
 }
@@ -139,7 +142,8 @@ async function buildEntry(raw: SourceEntry): Promise<Record<string, unknown> | n
       url: url.toString(),
       description: raw.description?.trim() ?? "",
       category,
-      ...catalogMetadata(raw)
+      ...catalogMetadata(raw),
+      icon: await inlineBundledCatalogIcon(id) ?? catalogIconDataUrl(id, raw.title.trim())
     };
   }
 
@@ -151,7 +155,9 @@ async function buildEntry(raw: SourceEntry): Promise<Record<string, unknown> | n
     return null;
   }
 
-  const icon = await inlineFirstIcon(resolved?.iconCandidates ?? []);
+  const icon = await inlineBundledCatalogIcon(id)
+    ?? await inlineFirstIcon(resolved?.iconCandidates ?? [])
+    ?? catalogIconDataUrl(id, title);
 
   console.log(`  ok       ${id}  "${title}"${icon ? "  +icon" : "  (no icon)"}`);
 
@@ -174,7 +180,9 @@ function catalogMetadata(raw: SourceEntry): Record<string, unknown> {
     stars: raw.stars,
     language: raw.language,
     license: raw.license,
-    verifiedAt: raw.verifiedAt
+    verifiedAt: raw.verifiedAt,
+    selfHosted: raw.selfHosted === true,
+    defaultPort: raw.defaultPort
   };
 }
 
@@ -202,6 +210,25 @@ async function inlineFirstIcon(candidates: string[]): Promise<string | null> {
   }
 
   return null;
+}
+
+async function inlineBundledCatalogIcon(id: string): Promise<string | null> {
+  const fileName = catalogIconFileName(id);
+  if (!fileName) return null;
+
+  try {
+    const bytes = await readFile(path.join(projectRoot, "public", "catalog-icons", fileName));
+    if (bytes.length === 0 || bytes.length > maxIconBytes) return null;
+    const extension = path.extname(fileName).toLowerCase();
+    const contentType = extension === ".svg"
+      ? "image/svg+xml"
+      : extension === ".png"
+        ? "image/png"
+        : "image/x-icon";
+    return `data:${contentType};base64,${bytes.toString("base64")}`;
+  } catch {
+    return null;
+  }
 }
 
 async function inlineIcon(candidate: string): Promise<string | null> {

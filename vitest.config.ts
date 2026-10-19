@@ -9,6 +9,6 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts", "daemon/**/*.test.mjs"]
+    include: ["src/**/*.test.ts", "src/**/*.test.mjs", "daemon/**/*.test.mjs"]
   }
 });

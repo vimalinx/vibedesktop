@@ -27,7 +27,7 @@ export async function getDesktopPayload(user: VibeUser): Promise<DesktopPayload>
 
 export async function updateDesktop(
   user: VibeUser,
-  updates: Partial<Pick<Desktop, "wallpaperKind" | "wallpaperBuiltinId" | "startAppId" | "themeId" | "shellStyle" | "accentOverride" | "fontOverride">>
+  updates: Partial<Pick<Desktop, "wallpaperKind" | "wallpaperBuiltinId" | "wallpaperFit" | "startAppId" | "themeId" | "shellStyle" | "accentOverride" | "fontOverride">>
 ): Promise<DesktopPayload> {
   return store.updateDesktop(user, updates);
 }

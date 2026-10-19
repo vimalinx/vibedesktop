@@ -71,14 +71,14 @@ function SelectContent({
     "align" | "alignOffset" | "side" | "sideOffset" | "alignItemWithTrigger"
   >) {
   return (
-    <SelectPrimitive.Portal>
+    <SelectPrimitive.Portal container={typeof document === "undefined" ? undefined : document.querySelector<HTMLElement>(".desktop") ?? undefined}>
       <SelectPrimitive.Positioner
         side={side}
         sideOffset={sideOffset}
         align={align}
         alignOffset={alignOffset}
         alignItemWithTrigger={alignItemWithTrigger}
-        className="isolate z-50"
+        className="system-select-positioner isolate z-[12000]"
       >
         <SelectPrimitive.Popup
           data-slot="select-content"

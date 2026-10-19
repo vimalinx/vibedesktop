@@ -4,22 +4,25 @@
  * Mirrors the `vibed` installer's design (src/lib/vibed-installer.ts):
  *   - Linux-only, non-root, user-scoped XDG paths.
  *   - Versioned, git-sourced app tree under
- *     ${XDG_DATA_HOME:-~/.local/share}/vibedesktop/app/versions/<id>/
+ *     ${XDG_DATA_HOME:-~/.local/share}/vibedesktop/app/releases/<id>/
  *     with an atomic `current` symlink and an lkg.json rollback target.
  *   - A generated `vibedesktop` CLI wrapper with
  *     status/logs/start/stop/restart/update/rollback/uninstall.
+ *   - An XDG desktop entry whose executable and icon resolve through the
+ *     installed tree rather than a development checkout.
  *   - A systemd user unit running `next start`.
  *   - A Node-less /bin/sh preamble that downloads a pinned Node build when no
  *     system Node >= 20 is on PATH (same bootstrap as vibed).
  *
  * Update model (git clone + git pull, per the chosen source model):
- *   - First install: git clone --branch <tag> <repo> into versions/<id>.
+ *   - First install: git clone --branch <tag> <repo> into releases/<id>.
  *   - update: git fetch + reset --hard <latest-tag> into a fresh staging dir,
  *     npm ci, next build, atomic switch of `current`, health poll, LKG rollback
- *     on failure. State dir (vibedesktop-data) is never touched.
+ *     on failure. State under XDG_STATE_HOME is never touched.
  *
- * The app talks to vibed via VIBE_DAEMON_DATA_DIR, which the generated unit
- * points at the vibed state directory — so the two installers compose: this
+ * The app talks to vibed through its XDG runtime endpoint directory, while
+ * daemon configuration and durable state use their matching XDG homes. The two
+ * installers compose: this
  * one downloads and runs the matching vibed installer on every install/update.
  *
  * Unlike the vibed installer, the app source is far too large to base64-embed,
@@ -58,11 +61,11 @@ export const appInstallerPath = "/api/setup/app";
  *   2. Bootstraps a pinned Node if none >= 20 is on PATH.
  *   3. Resolves the install tag (defaults to the embedded tag; `--tag` overrides).
  *   4. Computes a version id = "<tag>+<commitSha12>" via `git ls-remote`.
- *   5. Clones the repo at that tag into versions/<versionId>, runs npm ci +
- *      next build, drops .git to keep the tree small.
+ *   5. Clones the repo at that tag into releases/<versionId>, runs npm ci +
+ *      next build, prunes development dependencies, and drops .git.
  *   6. Atomically switches `current` to the new version, records LKG.
  *   7. Writes the `vibedesktop` CLI wrapper, the `vibedesktop-run` launcher,
- *      and the systemd user unit.
+ *      the systemd user unit, and the XDG desktop entry.
  *   8. Downloads the matching vibed installer to a temporary file, then runs it
  *      only after the download succeeds (composition, not duplication).
  *   9. Enables + restarts the app service, polls the app origin for health.
@@ -76,10 +79,13 @@ export function buildAppInstaller(): string {
     'APP_ROOT=__APP_ROOT__',
     'APP="$APP_ROOT/current"',
     "DATA_DIR=__DATA_DIR__",
-    "DAEMON_DATA_DIR=__DAEMON_DATA_DIR__",
+    "DAEMON_CONFIG_DIR=__DAEMON_CONFIG_DIR__",
+    "DAEMON_STATE_DIR=__DAEMON_STATE_DIR__",
+    "DAEMON_RUNTIME_DIR=__DAEMON_RUNTIME_DIR__",
     "APP_PORT=__APP_PORT__",
     "REPO=__REPO__",
     "UNIT_PATH=__UNIT_PATH__",
+    "DESKTOP_PATH=__DESKTOP_PATH__",
     "UNIT=vibedesktop-app.service",
     'if [ ! -x "$NODE" ]; then NODE=$(command -v node || true); fi',
     'if [ -z "$NODE" ]; then printf \'%s\\n\' \'Node.js 20 or newer is required.\' >&2; exit 1; fi',
@@ -87,7 +93,9 @@ export function buildAppInstaller(): string {
     'if [ ! -x "$NPM" ]; then NPM=$(command -v npm || true); fi',
     'if [ -z "$NPM" ]; then printf \'%s\\n\' \'npm is required to update Vibe Desktop.\' >&2; exit 1; fi',
     'export VIBE_DATA_FILE="$DATA_DIR/vibedesktop.json"',
-    'export VIBE_DAEMON_DATA_DIR="$DAEMON_DATA_DIR"',
+    'export VIBE_DAEMON_CONFIG_DIR="$DAEMON_CONFIG_DIR"',
+    'export VIBE_DAEMON_STATE_DIR="$DAEMON_STATE_DIR"',
+    'export VIBE_DAEMON_RUNTIME_DIR="$DAEMON_RUNTIME_DIR"',
     'export VIBE_APP_PORT="$APP_PORT"',
     'export VIBE_APP_ORIGIN="http://127.0.0.1:$APP_PORT"',
     'export VIBE_DESKTOP_URL="$VIBE_APP_ORIGIN/start"',
@@ -97,10 +105,12 @@ export function buildAppInstaller(): string {
     '  status) exec systemctl --user status "$UNIT" --no-pager ;;',
     '  open) exec "$NODE" "$APP/scripts/launch-desktop-chromium.mjs" ;;',
     '  logs) exec journalctl --user -u "$UNIT" -f ;;',
+    '  add) exec python3 "$APP/.claude/skills/add_app/add.py" "$@" ;;',
+    '  scan) exec python3 "$APP/.claude/skills/add_app/scan.py" "$@" ;;',
     '  update) exec "$NODE" "$APP/daemon/release/app-lifecycle.mjs" update --app-root "$APP_ROOT" --repo "$REPO" --npm "$NPM" --unit "$UNIT" "$@" ;;',
     '  rollback) exec "$NODE" "$APP/daemon/release/app-lifecycle.mjs" rollback --app-root "$APP_ROOT" --unit "$UNIT" "$@" ;;',
-    '  uninstall) exec "$NODE" "$APP/daemon/release/app-lifecycle.mjs" uninstall --app-root "$APP_ROOT" --bin __VIBEDESKTOP_BIN__ --unit-path "$UNIT_PATH" --unit "$UNIT" "$@" ;;',
-    "  *) printf '%s\\n' 'Usage: vibedesktop [open|status|start|stop|restart|logs|update|rollback|uninstall]' >&2; exit 2 ;;",
+    '  uninstall) exec "$NODE" "$APP/daemon/release/app-lifecycle.mjs" uninstall --app-root "$APP_ROOT" --bin __VIBEDESKTOP_BIN__ --unit-path "$UNIT_PATH" --desktop-path "$DESKTOP_PATH" --unit "$UNIT" "$@" ;;',
+    "  *) printf '%s\\n' 'Usage: vibedesktop [open|status|start|stop|restart|logs|add <dir> [--plan|--start] [--name NAME]|scan|update|rollback|uninstall]' >&2; exit 2 ;;",
     "esac",
     ""
   ];
@@ -113,13 +123,17 @@ export function buildAppInstaller(): string {
     "[Service]",
     "Type=simple",
     "WorkingDirectory=__WORKING_DIRECTORY__",
-    "ExecStart=%h/.local/bin/vibedesktop-run",
+    "ExecStart=__EXEC_START__",
     "Restart=on-failure",
     "RestartSec=3",
     "TimeoutStopSec=15",
     "Environment=NODE_ENV=production",
     "Environment=__DATA_ENV__",
-    "Environment=__DAEMON_DATA_ENV__",
+    "Environment=__CATALOG_ENV__",
+    "Environment=__CATALOG_CACHE_ENV__",
+    "Environment=__DAEMON_CONFIG_ENV__",
+    "Environment=__DAEMON_STATE_ENV__",
+    "Environment=__DAEMON_RUNTIME_ENV__",
     "Environment=VIBE_APP_PORT=__APP_PORT__",
     "Environment=__PATH_ENV__",
     "UMask=0077",
@@ -134,9 +148,29 @@ export function buildAppInstaller(): string {
     "NODE=__NODE__",
     'if [ ! -x "$NODE" ]; then NODE=$(command -v node || true); fi',
     'if [ -z "$NODE" ]; then printf \'%s\\n\' \'Node.js 20 or newer is required.\' >&2; exit 1; fi',
-    'APP_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/vibedesktop/app/current"',
+    "APP_ROOT=__APP_CURRENT__",
     'APP_PORT="${VIBE_APP_PORT:-${PORT:-__APP_PORT__}}"',
+    '# Slim releases run the traced standalone server; older full checkouts keep `next start`.',
+    'if [ -f "$APP_ROOT/server.js" ]; then',
+    '  export PORT="$APP_PORT" HOSTNAME=127.0.0.1',
+    '  exec "$NODE" "$APP_ROOT/server.js"',
+    'fi',
     'exec "$NODE" "$APP_ROOT/node_modules/next/dist/bin/next" start --hostname 127.0.0.1 --port "$APP_PORT"'
+  ];
+  const desktopEntryTemplate = [
+    "[Desktop Entry]",
+    "Type=Application",
+    "Version=1.0",
+    "Name=Vibe Desktop",
+    "GenericName=Web Desktop",
+    "Comment=Local webapp desktop — manage and run your local webapps as desktop icons",
+    "Exec=__EXEC__ open",
+    "Icon=__ICON__",
+    "Terminal=false",
+    "Categories=Utility;",
+    "Keywords=vibe;desktop;webapp;local;",
+    "StartupNotify=true",
+    ""
   ];
 
   return `#!/bin/sh
@@ -244,7 +278,7 @@ export VIBEDESKTOP_INSTALL_NPM="$NPM"
 export VIBEDESKTOP_INSTALL_PORT="$APP_PORT"
 
 "$NODE" --input-type=module <<'VIBEDESKTOP_APP_INSTALLER'
-import { chmod, mkdir, readFile, rename, rm, stat, writeFile, symlink } from "node:fs/promises";
+import { chmod, copyFile, mkdir, readdir, readFile, readlink, rename, rm, stat, writeFile, symlink } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -261,39 +295,71 @@ if (!Number.isInteger(APP_PORT) || APP_PORT < 1 || APP_PORT > 65535) {
 const home = homedir();
 const dataHome = absoluteXdg(process.env.XDG_DATA_HOME, path.join(home, ".local", "share"));
 const configHome = absoluteXdg(process.env.XDG_CONFIG_HOME, path.join(home, ".config"));
+const stateHome = absoluteXdg(process.env.XDG_STATE_HOME, path.join(home, ".local", "state"));
+const runtimeHome = absoluteXdg(process.env.XDG_RUNTIME_DIR, path.join(stateHome, "runtime"));
+const binHome = absoluteXdg(process.env.XDG_BIN_HOME, path.join(home, ".local", "bin"));
 const appRoot = path.join(dataHome, "vibedesktop", "app");
-const versionsDir = path.join(appRoot, "versions");
-const stateDir = path.join(dataHome, "vibedesktop-data");
-const daemonStateDir = path.join(dataHome, "vibed-vibedesktop");
-const binDir = path.join(home, ".local", "bin");
+const releasesDir = path.join(appRoot, "releases");
+const legacyVersionsDir = path.join(appRoot, "versions");
+const stateDir = path.join(stateHome, "vibedesktop");
+const legacyStateDir = path.join(dataHome, "vibedesktop-data");
+const daemonConfigDir = path.join(configHome, "vibed");
+const daemonStateDir = path.join(stateHome, "vibed");
+const daemonRuntimeDir = path.join(runtimeHome, "vibed");
+const binDir = binHome;
 const vibedesktopBin = path.join(binDir, "vibedesktop");
 const vibedesktopRun = path.join(binDir, "vibedesktop-run");
 const unitDir = path.join(configHome, "systemd", "user");
 const unitPath = path.join(unitDir, "vibedesktop-app.service");
+const applicationsDir = path.join(dataHome, "applications");
+const desktopPath = path.join(applicationsDir, "vibedesktop.desktop");
+const iconPath = path.join(appRoot, "current", "public", "icon.svg");
 
-const finalVersionDir = path.join(versionsDir, VERSION_ID);
+await migrateLegacyReleases();
+await migrateLegacyDesktopState();
+
+const finalVersionDir = path.join(releasesDir, VERSION_ID);
 if (!(await pathExists(finalVersionDir))) {
-  await ensureDirectory(versionsDir, 0o700);
-  const stagingDir = path.join(versionsDir, ".staging-" + process.pid + "-" + VERSION_ID);
+  await ensureDirectory(releasesDir, 0o700);
+  const stagingDir = path.join(releasesDir, ".staging-" + process.pid + "-" + VERSION_ID);
+  const assembledDir = stagingDir + ".release";
   try {
     await ensureDirectory(stagingDir, 0o700);
     await run("git", ["clone", "--depth", "1", "--branch", TAG, REPO, stagingDir]);
-    await run(NPM_BIN, ["ci"], { cwd: stagingDir });
-    await run(NPM_BIN, ["run", "build"], { cwd: stagingDir });
-    await rm(path.join(stagingDir, ".git"), { recursive: true, force: true });
+    await run(NPM_BIN, ["ci", "--no-audit", "--no-fund"], { cwd: stagingDir });
+    // Tags that ship the assembler become a slim standalone release (no compiler,
+    // build cache, dev dependencies, or sources); older tags keep the full checkout.
+    const assembler = path.join(stagingDir, "scripts", "assemble-release.mjs");
+    const slim = await pathExists(assembler);
+    await run(NPM_BIN, ["run", "build"], { cwd: stagingDir, env: slim ? { ...process.env, VIBE_STANDALONE: "1" } : process.env });
+    let releaseDir = stagingDir;
+    if (slim) {
+      await run(NODE_BIN, [assembler, stagingDir, assembledDir]);
+      await rm(stagingDir, { recursive: true, force: true });
+      releaseDir = assembledDir;
+    } else {
+      await run(NPM_BIN, ["prune", "--omit=dev"], { cwd: stagingDir });
+      await rm(path.join(stagingDir, ".git"), { recursive: true, force: true });
+    }
     await writeFile(
-      path.join(stagingDir, ".installed-version.json"),
+      path.join(releaseDir, ".installed-version.json"),
       JSON.stringify({ version: VERSION_ID, tag: TAG, repo: REPO, port: APP_PORT, installedAt: new Date().toISOString() }, null, 2) + "\\n",
       { mode: 0o600 }
     );
-    await rename(stagingDir, finalVersionDir);
+    await rename(releaseDir, finalVersionDir);
   } catch (error) {
     await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+    await rm(assembledDir, { recursive: true, force: true }).catch(() => {});
     throw error;
   }
 }
 
-await switchCurrent(appRoot, VERSION_ID);
+const previousVersionId = await switchCurrent(appRoot, VERSION_ID);
+// Keep only the running release and its rollback target; drop leftovers of interrupted installs.
+for (const entry of await readdir(releasesDir).catch(() => [])) {
+  if (entry === VERSION_ID || entry === previousVersionId) continue;
+  await rm(path.join(releasesDir, entry), { recursive: true, force: true }).catch(() => {});
+}
 
 await ensureDirectory(stateDir, 0o700);
 await ensureDirectory(binDir, 0o755, false);
@@ -302,16 +368,20 @@ const wrapper = ${JSON.stringify(wrapperTemplate, null, 2)}.map((line) => line
   .replaceAll("__NODE__", () => shellQuote(NODE_BIN))
   .replaceAll("__APP_ROOT__", () => shellQuote(appRoot))
   .replaceAll("__DATA_DIR__", () => shellQuote(stateDir))
-  .replaceAll("__DAEMON_DATA_DIR__", () => shellQuote(daemonStateDir))
+  .replaceAll("__DAEMON_CONFIG_DIR__", () => shellQuote(daemonConfigDir))
+  .replaceAll("__DAEMON_STATE_DIR__", () => shellQuote(daemonStateDir))
+  .replaceAll("__DAEMON_RUNTIME_DIR__", () => shellQuote(daemonRuntimeDir))
   .replaceAll("__APP_PORT__", () => shellQuote(String(APP_PORT)))
   .replaceAll("__REPO__", () => shellQuote(REPO))
   .replaceAll("__UNIT_PATH__", () => shellQuote(unitPath))
+  .replaceAll("__DESKTOP_PATH__", () => shellQuote(desktopPath))
   .replaceAll("__VIBEDESKTOP_BIN__", () => shellQuote(vibedesktopBin)))
   .join("\\n");
 await writeAtomic(vibedesktopBin, Buffer.from(wrapper), 0o700);
 
 const runScript = ${JSON.stringify(runScriptTemplate, null, 2)}.map((line) => line
   .replaceAll("__NODE__", () => shellQuote(NODE_BIN))
+  .replaceAll("__APP_CURRENT__", () => shellQuote(path.join(appRoot, "current")))
   .replaceAll("__APP_PORT__", () => shellQuote(String(APP_PORT))))
   .join("\\n");
 await writeAtomic(vibedesktopRun, Buffer.from(runScript), 0o700);
@@ -320,31 +390,65 @@ await ensureDirectory(unitDir, 0o700, false);
 const service = ${JSON.stringify(serviceTemplate, null, 2)}.map((line) => line
   .replaceAll("__APP_PORT__", () => String(APP_PORT))
   .replaceAll("__WORKING_DIRECTORY__", () => systemdPath(path.join(appRoot, "current")))
+  .replaceAll("__EXEC_START__", () => systemdPath(vibedesktopRun))
   .replaceAll("__DATA_ENV__", () => systemdQuote("VIBE_DATA_FILE=" + path.join(stateDir, "vibedesktop.json")))
-  .replaceAll("__DAEMON_DATA_ENV__", () => systemdQuote("VIBE_DAEMON_DATA_DIR=" + daemonStateDir))
+  .replaceAll("__CATALOG_ENV__", () => systemdQuote("VIBE_LOCAL_CATALOG_FILE=" + path.join(stateDir, "local-catalog.json")))
+  .replaceAll("__CATALOG_CACHE_ENV__", () => systemdQuote("VIBE_CATALOG_CACHE_FILE=" + path.join(stateDir, "catalog-cache.json")))
+  .replaceAll("__DAEMON_CONFIG_ENV__", () => systemdQuote("VIBE_DAEMON_CONFIG_DIR=" + daemonConfigDir))
+  .replaceAll("__DAEMON_STATE_ENV__", () => systemdQuote("VIBE_DAEMON_STATE_DIR=" + daemonStateDir))
+  .replaceAll("__DAEMON_RUNTIME_ENV__", () => systemdQuote("VIBE_DAEMON_RUNTIME_DIR=" + daemonRuntimeDir))
   .replaceAll("__PATH_ENV__", () => systemdQuote("PATH=" + (process.env.PATH || "/usr/local/bin:/usr/bin:/bin"))))
   .join("\\n");
 await writeAtomic(unitPath, Buffer.from(service), 0o600);
+
+await ensureDirectory(applicationsDir, 0o755, false);
+const desktopEntry = ${JSON.stringify(desktopEntryTemplate, null, 2)}.map((line) => line
+  .replaceAll("__EXEC__", () => desktopExecArg(vibedesktopBin))
+  .replaceAll("__ICON__", () => iconPath))
+  .join("\\n");
+await writeAtomic(desktopPath, Buffer.from(desktopEntry), 0o644);
 
 console.log("Installed Vibe Desktop app " + VERSION_ID + " at " + finalVersionDir + ".");
 
 async function switchCurrent(appRoot, versionId) {
   const currentLink = path.join(appRoot, "current");
   const lkgPath = path.join(appRoot, "lkg.json");
+  // The rollback target is whatever actually ran before this switch.
   let previous = null;
   try {
-    const lkg = JSON.parse(await readFile(lkgPath, "utf8"));
-    if (lkg && typeof lkg.current === "string") previous = lkg.current;
+    const running = path.basename(await readlink(currentLink));
+    if (running !== versionId && await pathExists(path.join(releasesDir, running))) previous = running;
   } catch {}
+  if (!previous) {
+    try {
+      const lkg = JSON.parse(await readFile(lkgPath, "utf8"));
+      if (lkg && typeof lkg.previous === "string" && lkg.previous !== versionId) previous = lkg.previous;
+    } catch {}
+  }
   const stagingLink = currentLink + ".swap." + process.pid;
   await rm(stagingLink, { force: true });
-  await symlink(path.join("versions", versionId), stagingLink);
+  await symlink(path.join("releases", versionId), stagingLink);
   await rename(stagingLink, currentLink);
   await writeAtomic(
     lkgPath,
     Buffer.from(JSON.stringify({ current: versionId, previous, updatedAt: new Date().toISOString() }, null, 2) + "\\n"),
     0o600
   );
+  return previous;
+}
+
+async function migrateLegacyReleases() {
+  if (!(await pathExists(legacyVersionsDir)) || await pathExists(releasesDir)) return;
+  await rename(legacyVersionsDir, releasesDir);
+}
+
+async function migrateLegacyDesktopState() {
+  const target = path.join(stateDir, "vibedesktop.json");
+  const legacy = path.join(legacyStateDir, "vibedesktop.json");
+  if (await pathExists(target) || !(await pathExists(legacy))) return;
+  await ensureDirectory(stateDir, 0o700);
+  await copyFile(legacy, target);
+  await chmod(target, 0o600);
 }
 
 function run(cmd, args, options = {}) {
@@ -407,15 +511,28 @@ function systemdPath(value) {
     return character;
   }).join("");
 }
+
+function desktopExecArg(value) {
+  const slash = String.fromCharCode(92);
+  const quote = String.fromCharCode(34);
+  const backtick = String.fromCharCode(96);
+  const dollar = String.fromCharCode(36);
+  const escaped = Array.from(value).map((character) =>
+    [slash, quote, backtick, dollar].includes(character) ? slash + character : character
+  ).join("");
+  return quote + escaped + quote;
+}
 VIBEDESKTOP_APP_INSTALLER
 
-VIBEDESKTOP_BIN="$HOME/.local/bin/vibedesktop"
-VIBED_BIN="$HOME/.local/bin/vibed"
+BIN_HOME="$HOME/.local/bin"
+case "\${XDG_BIN_HOME:-}" in /*) BIN_HOME=$XDG_BIN_HOME ;; esac
+VIBEDESKTOP_BIN="$BIN_HOME/vibedesktop"
+VIBED_BIN="$BIN_HOME/vibed"
 # Always install the matching vibed runtime. This upgrades an existing daemon
 # together with the app instead of leaving an older, protocol-incompatible
 # runtime in place. --install-only keeps service startup owned below.
 printf '%s\\n' 'Installing the matching vibed daemon (local WebApp manager)...'
-VIBED_INSTALLER_TMP="\${TMPDIR:-/tmp}/vibedesktop-vibed-installer.$$"
+VIBED_INSTALLER_TMP=$(mktemp "\${TMPDIR:-/tmp}/vibedesktop-vibed-installer.XXXXXXXX")
 trap 'rm -f "$VIBED_INSTALLER_TMP"' EXIT HUP INT TERM
 if command -v curl >/dev/null 2>&1; then
   curl -fsSL "$VIBED_INSTALLER_URL" -o "$VIBED_INSTALLER_TMP"

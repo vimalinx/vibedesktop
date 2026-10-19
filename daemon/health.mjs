@@ -9,13 +9,15 @@ import { isMainModule } from "./cli-entry.mjs";
  * or output. This reports daemon readiness, not an individual managed app's
  * loopback socket readiness.
  *
- * @param {{ dataDir: string; fetchImpl?: typeof fetch }} options
+ * @param {{ runtimeDir?: string; dataDir?: string; fetchImpl?: typeof fetch }} options
  */
 export async function checkVibedHealth(options) {
+  const runtimeDir = options.runtimeDir || options.dataDir;
+  if (!runtimeDir) return false;
   try {
     const [portText, tokenText] = await Promise.all([
-      readFile(path.join(options.dataDir, "daemon.port"), "utf8"),
-      readFile(path.join(options.dataDir, "daemon.token"), "utf8"),
+      readFile(path.join(runtimeDir, "daemon.port"), "utf8"),
+      readFile(path.join(runtimeDir, "daemon.token"), "utf8"),
     ]);
     const port = Number(portText.trim());
     const token = tokenText.trim();
@@ -42,8 +44,12 @@ export async function checkVibedHealth(options) {
 const isMain = isMainModule(import.meta.url);
 if (isMain) {
   const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  const dataDir = path.resolve(process.env.VIBE_DAEMON_DATA_DIR || path.join(projectRoot, ".data"));
-  checkVibedHealth({ dataDir }).then((healthy) => {
+  const runtimeDir = path.resolve(
+    process.env.VIBE_DAEMON_RUNTIME_DIR ||
+    process.env.VIBE_DAEMON_DATA_DIR ||
+    path.join(projectRoot, ".data")
+  );
+  checkVibedHealth({ runtimeDir }).then((healthy) => {
     if (healthy) {
       console.log("vibed is healthy");
     } else {

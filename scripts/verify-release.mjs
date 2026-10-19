@@ -39,9 +39,9 @@ try {
 
   await run("install public dependencies", "npm", ["ci"], publicRoot);
   await run(
-    "audit production dependencies",
+    "audit all dependencies",
     "npm",
-    ["audit", "--omit=dev", "--audit-level=high", "--registry=https://registry.npmjs.org"],
+    ["audit", "--audit-level=high", "--registry=https://registry.npmjs.org"],
     publicRoot,
   );
   await run("lint public source", "npm", ["run", "lint"], publicRoot);
@@ -51,6 +51,12 @@ try {
     "test add-app Agent Skill",
     "python3",
     ["-m", "unittest", "discover", "-s", ".claude/skills/add_app", "-p", "test_*.py", "-v"],
+    publicRoot,
+  );
+  await run(
+    "qualify all reviewed official installer recipes",
+    "sh",
+    ["catalog/installers/qualify-recipes.sh", path.join(scratchRoot, "recipe-qualification")],
     publicRoot,
   );
   await run("build public source", "npm", ["run", "build"], publicRoot);
@@ -94,9 +100,12 @@ function isolatedEnv(extra = {}) {
   return {
     ...process.env,
     HOME: isolatedHome,
-    XDG_DATA_HOME: path.join(isolatedHome, ".local", "share"),
-    XDG_CONFIG_HOME: path.join(isolatedHome, ".config"),
-    PATH: `${path.join(isolatedHome, ".local", "bin")}:${path.dirname(process.execPath)}:/usr/local/bin:/usr/bin:/bin`,
+    XDG_DATA_HOME: path.join(isolatedHome, "xdg", "data"),
+    XDG_CONFIG_HOME: path.join(isolatedHome, "xdg", "config"),
+    XDG_STATE_HOME: path.join(isolatedHome, "xdg", "state"),
+    XDG_RUNTIME_DIR: path.join(isolatedHome, "xdg", "runtime"),
+    XDG_BIN_HOME: path.join(isolatedHome, "xdg", "bin"),
+    PATH: `${path.join(isolatedHome, "xdg", "bin")}:${path.dirname(process.execPath)}:/usr/local/bin:/usr/bin:/bin`,
     ...extra,
   };
 }
@@ -117,13 +126,23 @@ async function assertRequiredPublicFiles(root) {
     ".github/workflows/ci.yml",
     ".github/workflows/release.yml",
     "browser-extension/vibe-embed-companion/manifest.json",
+    "CHANGELOG.md",
+    "CODE_OF_CONDUCT.md",
+    "catalog/installers/install-official.sh",
+    "catalog/installers/official-installer.mjs",
+    "catalog/installers/recipes.json",
     "daemon/release/app-lifecycle.mjs",
     "docs/releasing.md",
     "OPEN_SOURCE.md",
+    "SUPPORT.md",
+    "THIRD_PARTY_NOTICES.md",
     "scripts/check-product-boundary.mjs",
     "scripts/launch-desktop-chromium.mjs",
+    "scripts/assemble-release.mjs",
     "scripts/verify-release.mjs",
+    "README.zh-CN.md",
     "src/app/api/setup/app/route.ts",
+    "src/app/api/catalog-installs/[id]/agent-complete/route.ts",
     "src/lib/app-installer.ts",
   ];
   for (const relative of required) await stat(path.join(root, relative));
@@ -194,7 +213,7 @@ async function verifyVibedInstall(sourceRoot) {
   const dataHome = env.XDG_DATA_HOME;
   const runtimeRoot = path.join(dataHome, "vibedesktop", "runtime");
   const currentTarget = await readlink(path.join(runtimeRoot, "current"));
-  if (!currentTarget.startsWith("versions/")) throw new Error("vibed current symlink is not versioned.");
+  if (!currentTarget.startsWith("releases/")) throw new Error("vibed current symlink is not release-versioned.");
   const sourceSkill = path.join(sourceRoot, ".claude", "skills", "add_app");
   for (const [agentRoot, skillName] of [[".claude", "add_app"], [".codex", "add-app"], [".agents", "add-app"]]) {
     for (const relative of ["SKILL.md", "add.py", "scan.py", "manager.py", "references/managed-bundles.md", "agents/openai.yaml"]) {
@@ -203,14 +222,14 @@ async function verifyVibedInstall(sourceRoot) {
       if (!expected.equals(installed)) throw new Error(`${agentRoot} Skill mismatch: ${relative}`);
     }
   }
-  const cli = path.join(isolatedHome, ".local", "bin", "vibed");
+  const cli = path.join(env.XDG_BIN_HOME, "vibed");
   const cliText = await readFile(cli, "utf8");
   if (!cliText.includes("VIBE_RELEASE_PUBLIC_KEY") || /RELEASE_PUBLIC_KEY=''/.test(cliText)) {
     throw new Error("Installed vibed CLI is missing its release verification public key.");
   }
   const child = execStreaming(cli, ["run"], sourceRoot, env);
   try {
-    const stateDir = path.join(dataHome, "vibed-vibedesktop");
+    const stateDir = path.join(env.XDG_RUNTIME_DIR, "vibed");
     await poll(async () => {
       const port = (await readFile(path.join(stateDir, "daemon.port"), "utf8")).trim();
       const token = (await readFile(path.join(stateDir, "daemon.token"), "utf8")).trim();
@@ -228,18 +247,33 @@ async function verifyAppInstall(sourceRoot, tag) {
   const env = isolatedEnv();
   const appRoot = path.join(env.XDG_DATA_HOME, "vibedesktop", "app");
   const current = path.join(appRoot, "current");
-  const daemonStateDir = path.join(env.XDG_DATA_HOME, "vibed-vibedesktop");
+  const daemonConfigDir = path.join(env.XDG_CONFIG_HOME, "vibed");
+  const daemonStateDir = path.join(env.XDG_STATE_HOME, "vibed");
+  const daemonRuntimeDir = path.join(env.XDG_RUNTIME_DIR, "vibed");
+  const desktopStateDir = path.join(env.XDG_STATE_HOME, "vibedesktop");
   const version = JSON.parse(await readFile(path.join(current, ".installed-version.json"), "utf8"));
   if (version.tag !== tag || version.repo !== `file://${sourceRoot}`) throw new Error("Installed app provenance is incorrect.");
   if (!Number.isInteger(version.port) || version.port < 1 || version.port > 65535) throw new Error("Installed app port provenance is incorrect.");
   await stat(path.join(current, "scripts", "launch-desktop-chromium.mjs"));
   await stat(path.join(current, "browser-extension", "vibe-embed-companion", "manifest.json"));
-  const cli = path.join(isolatedHome, ".local", "bin", "vibedesktop");
+  // The installed release must be the slim standalone server, not a full checkout.
+  await stat(path.join(current, "server.js"));
+  if (await stat(path.join(current, ".git")).then(() => true, () => false)) throw new Error("Installed app release still contains git metadata.");
+  const currentTarget = await readlink(current);
+  if (!currentTarget.startsWith("releases/")) throw new Error("app current symlink is not release-versioned.");
+  const cli = path.join(env.XDG_BIN_HOME, "vibedesktop");
   await run("validate installed app CLI", "sh", ["-n", cli], sourceRoot, env);
   const unitPath = path.join(env.XDG_CONFIG_HOME, "systemd", "user", "vibedesktop-app.service");
   const unit = await readFile(unitPath, "utf8");
-  if (!unit.includes(`VIBE_DAEMON_DATA_DIR=${daemonStateDir}`)) {
-    throw new Error("Installed app unit does not use the canonical vibed state directory.");
+  for (const expected of [
+    `VIBE_DATA_FILE=${path.join(desktopStateDir, "vibedesktop.json")}`,
+    `VIBE_LOCAL_CATALOG_FILE=${path.join(desktopStateDir, "local-catalog.json")}`,
+    `VIBE_DAEMON_CONFIG_DIR=${daemonConfigDir}`,
+    `VIBE_DAEMON_STATE_DIR=${daemonStateDir}`,
+    `VIBE_DAEMON_RUNTIME_DIR=${daemonRuntimeDir}`,
+    `ExecStart=${path.join(env.XDG_BIN_HOME, "vibedesktop-run")}`,
+  ]) {
+    if (!unit.includes(expected)) throw new Error(`Installed app unit is missing XDG contract: ${expected}`);
   }
   if (unit.includes("vibedesktop-data/vibed-vibedesktop")) {
     throw new Error("Installed app unit retains the legacy, disconnected vibed state directory.");
@@ -248,16 +282,16 @@ async function verifyAppInstall(sourceRoot, tag) {
     await run("verify installed app systemd unit", "systemd-analyze", ["--user", "verify", unitPath], sourceRoot, env);
   }
 
-  const daemon = execStreaming(path.join(isolatedHome, ".local", "bin", "vibed"), ["run"], sourceRoot, env);
+  const daemon = execStreaming(path.join(env.XDG_BIN_HOME, "vibed"), ["run"], sourceRoot, env);
   const port = await freePort();
-  const child = execStreaming(path.join(isolatedHome, ".local", "bin", "vibedesktop-run"), [], current, isolatedEnv({
+  const child = execStreaming(path.join(env.XDG_BIN_HOME, "vibedesktop-run"), [], current, isolatedEnv({
     VIBE_APP_PORT: String(port),
-    VIBE_DAEMON_DATA_DIR: daemonStateDir,
+    VIBE_DAEMON_RUNTIME_DIR: daemonRuntimeDir,
   }));
   try {
     await poll(async () => {
-      const daemonPort = (await readFile(path.join(daemonStateDir, "daemon.port"), "utf8")).trim();
-      const daemonToken = (await readFile(path.join(daemonStateDir, "daemon.token"), "utf8")).trim();
+      const daemonPort = (await readFile(path.join(daemonRuntimeDir, "daemon.port"), "utf8")).trim();
+      const daemonToken = (await readFile(path.join(daemonRuntimeDir, "daemon.token"), "utf8")).trim();
       const response = await fetch(`http://127.0.0.1:${daemonPort}/health`, {
         headers: { authorization: `Bearer ${daemonToken}` },
       });

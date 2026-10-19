@@ -37,11 +37,14 @@ export interface DesktopDragTarget {
 function desktopGridTargetStyle(target: DesktopDragTarget, metrics: DesktopCellMetrics): CSSProperties {
   const width = target.span.columns === 1 ? 88 : target.span.columns * metrics.cellWidth;
   const height = target.span.rows === 1 ? 96 : target.span.rows * metrics.cellHeight;
+  const x = metrics.desktopInset + target.gridX * metrics.cellWidth;
+  const y = metrics.desktopInset + target.gridY * metrics.cellHeight;
   return {
-    left: metrics.desktopInset + target.gridX * metrics.cellWidth,
-    top: metrics.desktopInset + target.gridY * metrics.cellHeight,
+    left: 0,
+    top: 0,
     width,
-    height
+    height,
+    transform: `translate3d(${x}px, ${y}px, 0)`
   };
 }
 
@@ -49,7 +52,7 @@ export interface DesktopCanvasProps {
   apps: DesktopApp[];
   localAssets: Record<string, string>;
   activeDragAppId: string | null;
-  dragTarget: DesktopDragTarget | null;
+  dragTargetElementRef: Ref<HTMLDivElement>;
   weatherCity: string;
   weather: WeatherReading | null;
   weatherStatus: string;
@@ -69,7 +72,7 @@ export function DesktopCanvas({
   apps,
   localAssets,
   activeDragAppId,
-  dragTarget,
+  dragTargetElementRef,
   weatherCity,
   weather,
   weatherStatus,
@@ -277,15 +280,7 @@ export function DesktopCanvas({
         />
       ) : null}
 
-      {dragTarget ? (
-        <div
-          className={`desktop-grid-target ${dragTarget.adjusted ? "is-adjusted" : ""} ${
-            dragTarget.span.columns > 1 || dragTarget.span.rows > 1 ? "is-widget" : ""
-          }`}
-          style={desktopGridTargetStyle(dragTarget, metrics)}
-          aria-hidden="true"
-        />
-      ) : null}
+      <div ref={dragTargetElementRef} className="desktop-grid-target is-drag-overlay" aria-hidden="true" />
 
       {rows.map(([gridY, rowApps], rowIndex) => (
         <div

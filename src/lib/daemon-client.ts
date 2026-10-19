@@ -48,11 +48,14 @@ interface DaemonEndpoint {
 let endpointOverride: DaemonEndpoint | null | undefined;
 let testDataDir: string | undefined;
 
-function daemonDataDirs(): string[] {
+function daemonRuntimeDirs(): string[] {
   if (testDataDir) return [testDataDir];
+  const runtimeOverride = process.env.VIBE_DAEMON_RUNTIME_DIR?.trim();
+  if (runtimeOverride) return [path.resolve(runtimeOverride)];
   const override = process.env.VIBE_DAEMON_DATA_DIR?.trim();
   if (override) return [path.resolve(override)];
 
+  const configuredRuntimeHome = process.env.XDG_RUNTIME_DIR?.trim();
   const configuredDataHome = process.env.XDG_DATA_HOME?.trim();
   const dataHome = configuredDataHome && path.isAbsolute(configuredDataHome)
     ? configuredDataHome
@@ -61,6 +64,9 @@ function daemonDataDirs(): string[] {
   // The installed daemon is the durable owner used by the add_app Skill and
   // login service. Repository .data remains a development fallback.
   return [
+    ...(configuredRuntimeHome && path.isAbsolute(configuredRuntimeHome)
+      ? [path.join(configuredRuntimeHome, "vibed")]
+      : []),
     path.join(dataHome, "vibed-vibedesktop"),
     path.resolve(process.cwd(), ".data")
   ];
@@ -68,7 +74,7 @@ function daemonDataDirs(): string[] {
 
 async function readEndpoint(): Promise<DaemonEndpoint | null> {
   if (endpointOverride !== undefined) return endpointOverride;
-  for (const dataDir of daemonDataDirs()) {
+  for (const dataDir of daemonRuntimeDirs()) {
     try {
       const [portRaw, tokenRaw] = await Promise.all([
         readFile(path.join(dataDir, "daemon.port"), "utf8"),

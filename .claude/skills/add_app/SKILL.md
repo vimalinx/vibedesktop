@@ -1,6 +1,6 @@
 ---
 name: add-app
-description: Add local WebUIs to Vibe Desktop as daemon-managed applications. Use when the user names a project path or port to add, asks to generate a managed launcher, or asks to scan the computer for launchable WebUIs.
+description: "Register a named local WebUI in Vibe Desktop, or discover launchable WebUIs when scanning is requested."
 ---
 
 # Add App

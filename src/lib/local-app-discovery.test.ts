@@ -18,7 +18,9 @@ describe("local WebUI discovery bridge", () => {
           registerable: true,
           already_registered: false,
           dev: true,
-          note: "running"
+          note: "running",
+          icon_kind: "favicon",
+          icon: "data:image/png;base64,ZmFrZQ=="
         },
         { name: "bad", source: "x", note: "bad", port: 70000 }
       ]);
@@ -35,8 +37,31 @@ describe("local WebUI discovery bridge", () => {
       registerable: true,
       alreadyRegistered: false,
       dev: true,
-      note: "running"
+      note: "running",
+      iconKind: "favicon",
+      iconUrl: "data:image/png;base64,ZmFrZQ=="
     }]);
+  });
+
+  it("drops a remote discovery icon without dropping the app", async () => {
+    const [candidate] = await discoverLocalWebApps("/workspace", async () => JSON.stringify([{
+      name: "No icon",
+      source: "project:/tmp/no-icon",
+      port: 4322,
+      command: "npm",
+      args: ["run", "dev"],
+      cwd: "/tmp/no-icon",
+      running: false,
+      registerable: true,
+      already_registered: false,
+      dev: true,
+      note: "stopped",
+      icon_kind: "favicon",
+      icon: "https://tracker.example/icon.png"
+    }]));
+
+    expect(candidate).not.toHaveProperty("iconUrl");
+    expect(candidate).not.toHaveProperty("iconKind");
   });
 
   it("fails closed on invalid scanner output", async () => {

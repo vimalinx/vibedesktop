@@ -125,6 +125,8 @@ function parseCatalogEntry(raw: unknown): AppDirectoryItem | null {
     openingMode: "external_tab",
     category: nonEmptyString(raw.category) ?? defaultCatalogCategory,
     catalogKind,
+    ...(raw.selfHosted === true ? { selfHosted: true } : {}),
+    ...(validPort(raw.defaultPort) !== null ? { defaultPort: validPort(raw.defaultPort)! } : {}),
     ...(repositoryUrl ? { repositoryUrl } : {}),
     ...(nonNegativeInteger(raw.stars) !== null ? { stars: nonNegativeInteger(raw.stars)! } : {}),
     ...(nonEmptyString(raw.language) ? { language: nonEmptyString(raw.language)! } : {}),
@@ -164,6 +166,10 @@ function githubRepositoryUrl(value: unknown): string | null {
 
 function nonNegativeInteger(value: unknown): number | null {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+function validPort(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= 65535 ? value : null;
 }
 
 /**

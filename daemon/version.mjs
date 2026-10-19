@@ -4,7 +4,7 @@
  * `server.mjs` (health response) instead of hardcoding its own copy.
  *
  * When running from an installed, versioned runtime tree
- * (`versions/<versionId>/daemon/...`), `resolveRuntimeVersion` prefers the
+ * (`releases/<versionId>/daemon/...`), `resolveRuntimeVersion` prefers the
  * precise content-addressed version id recorded in the sibling
  * `manifest.json` written by the installer. A repository checkout (e.g.
  * `npm run daemon`) has no such manifest and falls back to this constant.
@@ -12,7 +12,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-export const DAEMON_RELEASE_VERSION = "0.1.8";
+export const DAEMON_RELEASE_VERSION = "0.2.0";
 
 /**
  * @param {string} daemonDir Absolute path to the running `daemon/` directory

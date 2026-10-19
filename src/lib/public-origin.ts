@@ -52,7 +52,31 @@ export function resolvePublicOrigin(
  * it is a bind-all address, so seeing it in a request URL means the request
  * arrived through something else rather than from a loopback browser.
  */
-function isLoopbackHost(hostname: string): boolean {
+/**
+ * DNS-rebinding guard: a page on an attacker's name that resolves to 127.0.0.1
+ * still sends its own name as Host. Only loopback names, or the configured
+ * public origin's host, may reach the app at all.
+ */
+export function isAllowedHost(hostHeader: string | null, env: NodeJS.ProcessEnv = process.env): boolean {
+  if (!hostHeader) return false;
+  let hostname: string;
+  let host: string;
+  try {
+    ({ hostname, host } = new URL(`http://${hostHeader}`));
+  } catch {
+    return false;
+  }
+  if (isLoopbackHost(hostname)) return true;
+  const configured = env.VIBE_PUBLIC_ORIGIN?.trim();
+  if (!configured) return false;
+  try {
+    return new URL(configured).host === host;
+  } catch {
+    return false;
+  }
+}
+
+export function isLoopbackHost(hostname: string): boolean {
   if (hostname === "localhost" || hostname.endsWith(".localhost")) return true;
   // URL keeps IPv6 literals bracketed, and normalizes every form of ::1.
   if (hostname === "[::1]") return true;

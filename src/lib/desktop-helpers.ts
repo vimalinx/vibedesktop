@@ -3,6 +3,7 @@ import type {
   BuiltinWallpaper,
   Desktop,
   DesktopApp,
+  DesktopPayload,
   DesktopTheme,
   LocalAppView,
   OpeningMode
@@ -31,6 +32,26 @@ export const desktopIconWidth = 92;
 export const desktopIconGap = 8;
 export const dragStartThreshold = 5;
 export const windowEdgeInset = 12;
+
+/**
+ * A stable identity for the browser-local assets a desktop needs. Position,
+ * size, title, and other app edits deliberately do not participate: those
+ * updates must not tear down and recreate the active wallpaper object URL.
+ */
+export function localAssetHydrationKey(
+  payload: Pick<DesktopPayload, "desktop" | "apps">,
+  localAppIconKeys: string[]
+): string {
+  return [
+    `desktop:${payload.desktop.id}:wallpaper`,
+    ...payload.apps
+      .filter((app) => app.iconKind === "custom_local")
+      .map((app) => `app:${app.id}:icon`),
+    ...localAppIconKeys
+  ]
+    .sort()
+    .join("\u0000");
+}
 
 export interface RestoredWindowDragOriginInput {
   pointerX: number;
@@ -256,6 +277,18 @@ export function isWeatherApp(app: DesktopApp): boolean {
 
 export function isStartBoardApp(app: DesktopApp): boolean {
   return app.kind === "builtin" && (app.iconUrl === "vd://icon/start-board" || app.title === "Start Board");
+}
+
+/**
+ * The Start Board and Local WebApps manager are both desktop-level surfaces.
+ * Showing them together creates two competing launch/control layers, so opening
+ * either one minimizes the other while leaving it available from the dock.
+ */
+export function shellSurfacesConflict(opening: DesktopApp, existing: DesktopApp): boolean {
+  return (
+    (isStartBoardApp(opening) && isLocalAppsApp(existing)) ||
+    (isLocalAppsApp(opening) && isStartBoardApp(existing))
+  );
 }
 
 export function isAppStoreApp(app: DesktopApp): boolean {
@@ -686,7 +719,8 @@ export function initialWindowSize(app: DesktopApp): { width: number; height: num
   if (isSettingsApp(app)) return { width: 840, height: 610 };
   if (isAppStoreApp(app)) return { width: 840, height: 600 };
   if (isWebUiImportApp(app)) return { width: 940, height: 740 };
-  if (isLocalAppsApp(app)) return { width: 780, height: 440 };
+  // The project manager is the main workspace: wide enough for one-line cards, still shorter than the start board.
+  if (isLocalAppsApp(app)) return { width: 960, height: 600 };
   if (app.kind === "builtin") return { width: 760, height: 520 };
   return { width: 880, height: 620 };
 }
@@ -810,15 +844,25 @@ export function isRunningStandalone(): boolean {
 /* ------------------------------------------------------------------ *
  * Local JSON storage
  * ------------------------------------------------------------------ */
+/**
+ * Stored values come from older versions, restored backups, or hand edits. A
+ * value whose JSON kind differs from the fallback's (null where an object is
+ * expected, a number where a string is) is ignored rather than crashing the UI.
+ */
 export function readLocalJson<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(key);
     if (!raw) return fallback;
-    return JSON.parse(raw) as T;
+    const value: unknown = JSON.parse(raw);
+    return fallback === null || jsonKind(value) === jsonKind(fallback) ? (value as T) : fallback;
   } catch {
     return fallback;
   }
+}
+
+function jsonKind(value: unknown): string {
+  return value === null ? "null" : Array.isArray(value) ? "array" : typeof value;
 }
 
 export function writeLocalJson(key: string, value: unknown): void {

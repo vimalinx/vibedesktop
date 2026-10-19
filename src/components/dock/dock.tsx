@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { DesktopApp, VibeUser } from "@/lib/contracts";
 import { desktopGridMinColumns, displayAppTitle, readLocalJson, writeLocalJson } from "@/lib/desktop-helpers";
 import type { I18nMessages } from "@/lib/i18n";
-import type { AppWindowState } from "@/components/window/desktop-window";
+import type { AppWindowState } from "@/protocol/shell/v1";
 
 export function Dock({
   user,
@@ -39,13 +39,14 @@ export function Dock({
         </button>
         <div className="dock-windows">
           {windows.length === 0 ? (
-            <span style={{ color: "var(--color-ink-faint)", fontFamily: "var(--font-mono)", fontSize: "0.74rem", letterSpacing: "0.06em", padding: "0 8px" }}>
+            <span className="dock-empty">
               {t.app.personalWebDesktop}
             </span>
           ) : null}
           {windows.map((windowState) => (
-            <button key={windowState.id} onClick={() => onFocus(windowState.id)}>
-              {displayAppTitle(windowState.app, t)}
+            <button key={windowState.id} className={windowState.mode === "minimized" ? "is-minimized" : "is-open"} onClick={() => onFocus(windowState.id)}>
+              <i className="dock-window-indicator" aria-hidden="true" />
+              <span>{displayAppTitle(windowState.app, t)}</span>
             </button>
           ))}
         </div>

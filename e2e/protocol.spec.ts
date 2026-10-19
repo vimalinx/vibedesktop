@@ -1,0 +1,52 @@
+import { test, expect } from "@playwright/test";
+import { createDesktopClient, packageCompatibility } from "../src/protocol/v1";
+import type { DesktopPayload } from "../src/protocol/v1";
+const origin = "http://127.0.0.1:3110";
+const headers = { Origin: origin };
+let baseline: DesktopPayload;
+test.beforeAll(async ({ request }) => { baseline = await (await request.get("/api/desktop")).json(); });
+test.afterEach(async ({ request }) => { expect((await request.post("/api/desktop/restore", { headers, data: baseline })).ok()).toBeTruthy(); });
+test("standalone SDK talks to the live versioned service and round-trips namespaced preferences", async () => {
+  // Node consumer imports only public SDK files, with a transport adapter for browser origin semantics.
+  const client = createDesktopClient({ fetch: (input, init) => fetch(origin + input, { ...init, headers: { ...init?.headers, Origin: origin } }) });
+  const host = await client.describe();
+  expect(packageCompatibility({ format: "vibedesktop-package", manifestVersion: 1, id: "org.example.shell", name: "Example", version: "1.0.0", protocol: { major: 1, minMinor: 0 }, requiredCapabilities: ["desktop", "packages.preferences"], preferencesSchemaVersion: 1 }, host).compatible).toBe(true);
+  expect(Array.isArray(await client.listCatalog())).toBe(true);
+  expect((await client.version.read()).version).toEqual(expect.any(String));
+  expect((await client.systemStatus.read()).hostname).toEqual(expect.any(String));
+  const a = "org.example.shell", b = "org.example.other";
+  const initial = await client.packagePreferences.read(a);
+  const saved = await client.packagePreferences.replace(a, { ifRevision: initial.revision, schemaVersion: 1, values: { dock: "bottom", nested: { width: 48 } } });
+  const concurrent = await Promise.allSettled(["left", "right"].map(dock => client.packagePreferences.replace(a, { ifRevision: saved.revision, schemaVersion: 1, values: { dock } })));
+  expect(concurrent.filter(r => r.status === "fulfilled")).toHaveLength(1);
+  expect(concurrent.find(r => r.status === "rejected")).toMatchObject({ reason: { code: "revision_conflict", status: 409 } });
+  expect((await client.packagePreferences.read(b)).revision).toBeNull();
+  const snapshot = await client.loadDesktop();
+  await client.updateDesktop({ shellStyle: "compact" });
+  expect((await client.loadDesktop()).desktop.packagePreferences).toEqual(snapshot.desktop.packagePreferences);
+  await client.restoreDesktop(snapshot);
+  const restored = await client.packagePreferences.read(a);
+  expect(restored.values).toEqual(snapshot.desktop.packagePreferences?.[a].values);
+  expect(restored.revision).not.toBe(snapshot.desktop.packagePreferences?.[a].revision);
+  await expect(client.packagePreferences.replace(a, { ifRevision: snapshot.desktop.packagePreferences![a].revision, schemaVersion: 1, values: {} })).rejects.toMatchObject({ status: 409 });
+  const legacy = structuredClone(snapshot); delete legacy.desktop.packagePreferences;
+  await client.restoreDesktop(legacy);
+  expect((await client.packagePreferences.read(a)).revision).toBeNull();
+});
+test("live v1 preserves legacy state and rejects invalid requests without changing it", async ({ request }) => {
+  const before = await (await request.get("/api/v1/desktop")).json();
+  expect(before.desktop.id).toBe(baseline.desktop.id);
+  const denied = await request.put("/api/v1/desktop/packages/org.example.shell/preferences", { headers: { Origin: "https://evil.example" }, data: { ifRevision: null, schemaVersion: 1, values: {} } });
+  expect(denied.status()).toBe(403); expect(denied.headers()["x-vibe-protocol"]).toBe("1.1");
+  const invalid = await request.patch("/api/v1/desktop", { headers, data: { shellStyle: 123 } });
+  expect(invalid.status()).toBe(400); expect((await invalid.json()).error.outcome).toBe("not_started");
+  expect((await request.delete("/api/v1/local-apps/discovery", { headers })).status()).toBe(405);
+  expect((await request.get("/api/v1/setup/app")).status()).toBe(404);
+  expect((await (await request.get("/api/desktop")).json()).desktop).toEqual(before.desktop);
+});
+test("default desktop explains protocol mismatch before loading apps", async ({ page }) => {
+  await page.route("**/api/v1", route => route.fulfill({ headers: { "x-vibe-protocol": "2.0" }, json: { protocol: "vibedesktop", version: { major: 2, minor: 0 } } }));
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: /retry|重试/i })).toBeVisible();
+  await expect(page.locator(".desktop-grid")).toHaveCount(0);
+});

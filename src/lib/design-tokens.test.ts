@@ -66,4 +66,14 @@ describe("design tokens", () => {
     }
     expect(css).toMatch(/prefers-reduced-motion: reduce\)\s*\{\s*:root\s*\{\s*--motion-enabled: 0;/);
   });
+
+  it("keeps App Store cards flat instead of applying window-scale elevation", () => {
+    const cardRule = /\.catalog-store-panel \.store-app-card\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    const hoverRule = /\.catalog-store-panel \.store-app-card:hover\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+
+    expect(cardRule).toContain("box-shadow: none");
+    expect(hoverRule).toContain("box-shadow: none");
+    expect(`${cardRule}\n${hoverRule}`).not.toContain("var(--elevation-");
+    expect(hoverRule).not.toContain("transform:");
+  });
 });

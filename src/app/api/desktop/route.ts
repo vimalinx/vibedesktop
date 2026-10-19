@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { apiError, rejectCrossOriginMutation } from "@/lib/api-response";
+import { apiError, rejectCrossOriginMutation, invalidJsonBody, readJsonObject } from "@/lib/api-response";
 import { AuthRequiredError, requireCurrentUser } from "@/lib/auth";
 import { getDesktopPayload, updateDesktop } from "@/lib/persistence";
 import { StyleOverrideError, validateStyleOverrides } from "@/lib/style-packs";
-import type { ShellStyle, ThemeId, WallpaperKind } from "@/lib/contracts";
+import type { ShellStyle, ThemeId, WallpaperFit, WallpaperKind } from "@/lib/contracts";
 
 export const runtime = "nodejs";
 
@@ -27,19 +27,22 @@ export async function PATCH(request: Request) {
   if (csrf) return csrf;
   try {
     const user = await requireCurrentUser();
-    const body = (await request.json()) as {
+    const body = (await readJsonObject(request)) as null | {
       wallpaperKind?: WallpaperKind;
       wallpaperBuiltinId?: string;
+      wallpaperFit?: WallpaperFit;
       startAppId?: string | null;
       themeId?: ThemeId;
       shellStyle?: ShellStyle;
       accentOverride?: string | null;
       fontOverride?: string | null;
     };
+    if (!body) return invalidJsonBody();
     validateStyleOverrides(body);
     const payload = await updateDesktop(user, {
       wallpaperKind: body.wallpaperKind,
       wallpaperBuiltinId: body.wallpaperBuiltinId,
+      wallpaperFit: body.wallpaperFit,
       startAppId: body.startAppId,
       themeId: body.themeId,
       shellStyle: body.shellStyle,

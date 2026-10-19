@@ -5,20 +5,20 @@
  * switching, last-known-good (LKG) bookkeeping, and pruning.
  *
  * Layout under `runtimeRoot` (`${XDG_DATA_HOME}/vibedesktop/runtime`):
- *   versions/<versionId>/{manifest.json, daemon/**, node_modules/ws/**}
- *   current -> versions/<versionId>      (relative symlink)
+ *   releases/<versionId>/{manifest.json, daemon/**, node_modules/ws/**}
+ *   current -> releases/<versionId>      (relative symlink)
  *   lkg.json                             ({ previous, updatedAt })
  *
  * `runtimeRoot` never contains device identity, credentials, or app
- * configuration — that lives entirely in the separate `vibed-vibedesktop`
- * state directory and is never touched by anything in this module.
+ * configuration — that lives under XDG_CONFIG_HOME/vibed and
+ * XDG_STATE_HOME/vibed and is never touched by anything in this module.
  */
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, readlink, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { readJsonFile, writeSecureJson } from "./secure-json-store.mjs";
 
-export const VERSIONS_DIR = "versions";
+export const VERSIONS_DIR = "releases";
 export const CURRENT_LINK = "current";
 export const LKG_FILE = "lkg.json";
 export const MANIFEST_FILE = "manifest.json";
@@ -56,9 +56,9 @@ export function versionDirectory(runtimeRoot, versionId) {
  * Writes every manifest file into a private staging directory, verifying
  * each file's digest immediately after it hits disk. On any mismatch the
  * partial staging directory is removed and an error is thrown — nothing is
- * ever visible as `versions/<versionId>` unless every file verified clean.
+ * ever visible as `releases/<versionId>` unless every file verified clean.
  *
- * If `versions/<versionId>` already exists (identical content restaged),
+ * If `releases/<versionId>` already exists (identical content restaged),
  * this is a no-op success — reinstalling unchanged code never re-copies.
  *
  * @param {{ runtimeRoot: string; versionId: string; releaseVersion: string; generatedAt: string;

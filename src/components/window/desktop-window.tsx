@@ -1,7 +1,9 @@
 "use client";
 
 import { useRef, type PointerEvent as ReactPointerEvent } from "react";
-import type { DesktopApp } from "@/lib/contracts";
+import { ArrowUpRight, Minus, Square, Copy, X } from "lucide-react";
+import { WindowVisible } from "./window-visibility";
+import { splitBounds } from "@/lib/window-layout";
 import {
   displayAppTitle,
   dragStartThreshold,
@@ -11,19 +13,8 @@ import {
 } from "@/lib/desktop-helpers";
 import type { I18nMessages } from "@/lib/i18n";
 
-export type WindowMode = "open" | "minimized";
-
-export interface AppWindowState {
-  id: string;
-  app: DesktopApp;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  z: number;
-  mode: WindowMode;
-  maximized?: boolean;
-}
+import type { AppWindowState } from "@/protocol/shell/v1";
+export type { AppWindowState, WindowMode } from "@/protocol/shell/v1";
 
 interface WindowDragState {
   pointerId: number;
@@ -53,17 +44,15 @@ export function DesktopWindow({
   t: I18nMessages;
 }) {
   const dragRef = useRef<WindowDragState | null>(null);
-  const isTopDrawer = isLocalAppsApp(state.app);
-
-  if (state.mode === "minimized") {
-    return null;
-  }
+  const isTopDrawer = isLocalAppsApp(state.app) && !state.tiled;
 
   return (
     <section
       className={`app-window${state.maximized ? " is-maximized" : ""}${isTopDrawer ? " is-top-drawer" : ""}`}
+      hidden={state.mode === "minimized"}
+      inert={state.mode === "minimized"}
       data-presentation={isTopDrawer ? "top-drawer" : "window"}
-      style={
+      style={{ display: state.mode === "minimized" ? "none" : undefined, ...(
         isTopDrawer
           ? {
               left: "50%",
@@ -82,7 +71,7 @@ export function DesktopWindow({
               height: `min(${state.height}px, calc(100dvh - ${state.y}px - 82px))`,
               zIndex: state.z
             }
-      }
+      ) }}
       onPointerDown={onFocus}
     >
       <header
@@ -142,7 +131,13 @@ export function DesktopWindow({
           });
         }}
         onPointerUp={(event) => {
-          if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
+          if (dragRef.current?.pointerId === event.pointerId) {
+            if (Math.hypot(event.clientX - dragRef.current.startX, event.clientY - dragRef.current.startY) > dragStartThreshold && window.innerWidth >= 640) {
+              if (event.clientX < 24) onPatch(splitBounds("left", window.innerWidth, window.innerHeight));
+              else if (event.clientX > window.innerWidth - 24) onPatch(splitBounds("right", window.innerWidth, window.innerHeight));
+            }
+            dragRef.current = null;
+          }
         }}
         onPointerCancel={(event) => {
           if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
@@ -167,7 +162,7 @@ export function DesktopWindow({
               title={t.window.external}
               onPointerDown={(event) => event.stopPropagation()}
             >
-              ↗
+              <ArrowUpRight size={15} aria-hidden="true" />
             </a>
           ) : null}
           <button
@@ -179,7 +174,7 @@ export function DesktopWindow({
               onPatch({ mode: "minimized" });
             }}
           >
-            –
+            <Minus size={15} aria-hidden="true" />
           </button>
           {!isTopDrawer ? (
             <button
@@ -191,7 +186,7 @@ export function DesktopWindow({
                 onPatch({ maximized: !state.maximized });
               }}
             >
-              {state.maximized ? "❐" : "□"}
+              {state.maximized ? <Copy size={13} aria-hidden="true" /> : <Square size={13} aria-hidden="true" />}
             </button>
           ) : null}
           <button
@@ -204,11 +199,11 @@ export function DesktopWindow({
               onClose();
             }}
           >
-            ✕
+            <X size={15} aria-hidden="true" />
           </button>
         </div>
       </header>
-      <div className="window-body">{children}</div>
+      <div className="window-body"><WindowVisible.Provider value={state.mode === "open"}>{children}</WindowVisible.Provider></div>
       {!isTopDrawer ? (
         <button
           className="window-resize"

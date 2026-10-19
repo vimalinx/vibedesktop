@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useEffect, useRef } from "react";
 import type { I18nMessages } from "@/lib/i18n";
 
@@ -5,14 +6,23 @@ export function Dialog({
   title,
   children,
   onClose,
-  t
+  t,
+  className,
+  initialFocusSelector
 }: {
   title: string;
   children: React.ReactNode;
   onClose: () => void;
   t: I18nMessages;
+  className?: string;
+  initialFocusSelector?: string;
 }) {
   const dialogRef = useRef<HTMLElement>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   /* A dialog must be enterable and leavable without a mouse: focus moves to
      the first control on open, Escape closes, and focus returns to whatever
@@ -26,12 +36,16 @@ export function Dialog({
           'button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])'
         ) ?? [])
       ].filter((element) => !element.hasAttribute("disabled"));
-    focusables()[0]?.focus();
+    const requestedInitialFocus = initialFocusSelector
+      ? dialogRef.current?.querySelector<HTMLElement>(initialFocusSelector)
+      : null;
+    requestedInitialFocus?.focus();
+    if (!requestedInitialFocus) focusables()[0]?.focus();
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab") return;
@@ -53,13 +67,13 @@ export function Dialog({
       document.removeEventListener("keydown", handleKeyDown, true);
       if (opener?.isConnected) opener.focus();
     };
-  }, [onClose]);
+  }, [initialFocusSelector]);
 
-  return (
+  const content = (
     <div className="dialog-backdrop" onClick={onClose}>
       <section
         ref={dialogRef}
-        className="dialog"
+        className={`dialog ${className ?? ""}`.trim()}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -75,6 +89,8 @@ export function Dialog({
       </section>
     </div>
   );
+  // Dialogs share the desktop's theme but sit outside individual window stacking contexts.
+  return typeof document === "undefined" ? null : createPortal(content, document.querySelector(".desktop") ?? document.body);
 }
 
 function CloseIcon() {

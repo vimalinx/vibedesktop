@@ -102,8 +102,13 @@ export function EditAppDialog({
           onChange={async (event) => {
             const file = event.target.files?.[0];
             if (!file) return;
-            await onLocalIcon(file);
-            await save({ iconKind: "custom_local", iconUrl: null });
+            try {
+              await onLocalIcon(file);
+              await save({ iconKind: "custom_local", iconUrl: null });
+            } catch {
+              // Browser storage can be blocked or full; say so instead of failing silently.
+              setStatus(t.dialogs.changesSaveFailed);
+            }
           }}
         />
       </label>

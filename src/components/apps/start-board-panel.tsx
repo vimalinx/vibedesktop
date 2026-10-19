@@ -1,5 +1,9 @@
 "use client";
 
+import { useWindowVisible } from "@/components/window/window-visibility";
+import { useSystemTools } from "@/components/packages/system-tools-context";
+import { Activity, List, Server } from "lucide-react";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DaemonHealth, LocalAppControlAction, LocalAppView, SystemStatus } from "@/lib/contracts";
 import { desktopData } from "@/lib/desktop-data";
@@ -18,6 +22,11 @@ export function StartBoardPanel({
   onControlLocalApp: (id: string, action: LocalAppControlAction) => Promise<void>;
   onOpenLocalApp: (app: LocalAppView) => void;
 }) {
+  const tools = useSystemTools();
+  const native = tools && ["windows", "macos"].includes(tools.presentation.appearance);
+  const [view, setView] = useState("processes");
+  const zh = t.settings.nav.general === "通用";
+  const panelVisible = useWindowVisible();
   const [system, setSystem] = useState<SystemStatus | null>(null);
   const [daemon, setDaemon] = useState<DaemonHealth | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -30,21 +39,22 @@ export function StartBoardPanel({
     const [nextSystem, nextDaemon] = await Promise.all([
       source.systemStatus.read().catch(() => null),
       source.localApps.daemonStatus().catch(() => ({ ok: false })),
-      ...(includeApps ? [onRefreshLocalApps()] : [])
+      ...(includeApps ? [onRefreshLocalApps().catch(() => undefined)] : [])
     ]);
     setSystem(nextSystem);
     setDaemon(nextDaemon);
     setRefreshing(false);
-    setAnnouncement(t.startBoard.statusUpdated);
+    // Announce only refreshes the user asked for; background polling stays silent for screen readers.
+    if (includeApps) setAnnouncement(t.startBoard.statusUpdated);
   }, [onRefreshLocalApps, t.startBoard.statusUpdated]);
 
   useEffect(() => {
     void refreshStatus();
     const timer = window.setInterval(() => {
-      if (!document.hidden) void refreshStatus();
+      if (panelVisible && !document.hidden) void refreshStatus();
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [refreshStatus]);
+  }, [refreshStatus, panelVisible]);
 
   const totals = useMemo(() => localApps.reduce(
     (sum, app) => ({
@@ -61,16 +71,24 @@ export function StartBoardPanel({
   async function control(app: LocalAppView, action: LocalAppControlAction) {
     setBusyId(app.id);
     setAnnouncement("");
-    await onControlLocalApp(app.id, action);
-    setBusyId(null);
-    setAnnouncement(`${app.name}: ${action}`);
+    try {
+      await onControlLocalApp(app.id, action);
+      setAnnouncement(`${app.name}: ${action}`);
+    } catch (error) {
+      setAnnouncement(error instanceof Error ? error.message : String(error));
+    } finally { setBusyId(null); }
   }
 
   return (
-    <div className="builtin-panel system-panel start-board-panel task-manager-panel">
+    <div className="builtin-panel system-panel start-board-panel task-manager-panel" data-system-tool="activity" data-native-layout={native ? tools.presentation.appearance : "classic"} data-view={view}>
+      {native ? <nav className="native-task-navigation" aria-label={zh ? "系统监视视图" : "System monitor views"}>{[
+        { id: "processes", label: zh ? "进程" : "Processes", icon: List },
+        { id: "performance", label: zh ? "性能" : "Performance", icon: Activity },
+        { id: "services", label: zh ? "服务" : "Services", icon: Server },
+      ].map(({ id, label, icon: Icon }) => <button key={id} aria-pressed={view === id} onClick={() => setView(id)}><Icon size={18} aria-hidden="true" /><span>{label}</span></button>)}</nav> : null}
       <header className="system-panel-header task-manager-header">
         <div>
-          <h2>{t.startBoard.title}</h2>
+          <h2>{native ? tools.presentation.appearance === "macos" ? zh ? "活动监视器" : "Activity Monitor" : zh ? "任务管理器" : "Task Manager" : t.startBoard.title}</h2>
           <p>{t.startBoard.description}</p>
         </div>
         <div className="system-panel-actions">

@@ -42,6 +42,7 @@ describe("persistence facade", () => {
 
     const payload = await persistence.getDesktopPayload(user);
     expect(payload.desktop.userId).toBe(user.id);
+    expect(payload.desktop.wallpaperFit).toBe("cover");
     expect(payload.apps.length).toBeGreaterThan(0);
   });
 });

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { apiError, rejectCrossOriginMutation } from "@/lib/api-response";
+import { apiError, rejectCrossOriginMutation, invalidJsonBody, readJsonObject } from "@/lib/api-response";
 import { AuthRequiredError, requireCurrentUser } from "@/lib/auth";
-import { controlLocalApp, DaemonApiError, DaemonUnreachableError } from "@/lib/daemon-client";
+import { controlLocalApp, DaemonApiError, DaemonTimeoutError, DaemonUnreachableError } from "@/lib/daemon-client";
 
 export const runtime = "nodejs";
 
@@ -15,7 +15,8 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     await requireCurrentUser();
     const { id } = await context.params;
-    const body = (await request.json()) as { action?: "start" | "stop" | "restart" };
+    const body = (await readJsonObject(request)) as null | { action?: "start" | "stop" | "restart" };
+    if (!body) return invalidJsonBody();
 
     if (!body.action || !["start", "stop", "restart"].includes(body.action)) {
       return apiError(400, "invalid_request", "action must be start | stop | restart");
@@ -27,6 +28,7 @@ export async function POST(request: Request, context: RouteContext) {
     if (error instanceof AuthRequiredError) {
       return apiError(401, "auth_required", error.message);
     }
+    if (error instanceof DaemonTimeoutError) return apiError(504, "daemon_timeout", error.message);
     if (error instanceof DaemonUnreachableError) {
       return apiError(503, "daemon_unreachable", error.message);
     }

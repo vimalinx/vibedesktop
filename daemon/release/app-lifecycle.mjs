@@ -6,7 +6,8 @@
  *
  * Update model is git-clone + git-pull (the chosen source model): `update`
  * resolves the latest tag from the repo, clones it into a fresh
- * `versions/<id>` staging directory, runs `npm ci` + `next build`, atomically
+ * `releases/<id>` staging directory, runs `npm ci` + `next build`, prunes
+ * development dependencies, atomically
  * switches `current`, restarts the systemd user unit, polls the app's own
  *
  * Reuses `version-store.mjs`'s `switchCurrent`/`readLastKnownGoodVersionId`/
@@ -14,9 +15,10 @@
  * `app-root` — the layout is identical, only the contents differ.
  */
 import { execFile } from "node:child_process";
-import { rm, unlink, writeFile } from "node:fs/promises";
+import { mkdir, rm, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import { writeSecureJson } from "./secure-json-store.mjs";
 import { isMainModule } from "../cli-entry.mjs";
 import {
   pruneVersions,
@@ -45,31 +47,46 @@ export async function updateApp(options) {
   const tag = options.tag || (await resolveLatestTag(options.repo, runExecFile));
   const versionId = await resolveVersionId(options.repo, tag, runExecFile);
   const current = await readCurrentVersionId(options.appRoot);
+  const priorLkg = await readLastKnownGoodVersionId(options.appRoot);
   if (current === versionId) {
     return { from: current, to: versionId, rolledBack: false };
   }
-  const versionsDir = path.join(options.appRoot, "versions");
-  const stagingDir = path.join(versionsDir, ".staging-" + process.pid + "-" + versionId);
+  const releasesDir = path.join(options.appRoot, "releases");
+  const stagingDir = path.join(releasesDir, ".staging-" + process.pid + "-" + versionId);
+  await mkdir(releasesDir, { recursive: true, mode: 0o700 });
   await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+  const assembledDir = stagingDir + ".release";
   try {
     await runExecFile("git", ["clone", "--depth", "1", "--branch", tag, options.repo, stagingDir]);
-    await runExecFile(npmPath, ["ci"], { cwd: stagingDir });
-    await runExecFile(npmPath, ["run", "build"], { cwd: stagingDir });
-    await rm(path.join(stagingDir, ".git"), { recursive: true, force: true });
+    await runExecFile(npmPath, ["ci", "--no-audit", "--no-fund"], { cwd: stagingDir });
+    // Tags that ship the assembler become a slim standalone release; older tags keep the full checkout.
+    const assembler = path.join(stagingDir, "scripts", "assemble-release.mjs");
+    const slim = await stat(assembler).then(() => true, () => false);
+    await runExecFile(npmPath, ["run", "build"], { cwd: stagingDir, env: slim ? { ...process.env, VIBE_STANDALONE: "1" } : process.env });
+    let releaseDir = stagingDir;
+    if (slim) {
+      await runExecFile(process.execPath, [assembler, stagingDir, assembledDir]);
+      await rm(stagingDir, { recursive: true, force: true });
+      releaseDir = assembledDir;
+    } else {
+      await runExecFile(npmPath, ["prune", "--omit=dev"], { cwd: stagingDir });
+      await rm(path.join(stagingDir, ".git"), { recursive: true, force: true });
+    }
     await writeFile(
-      path.join(stagingDir, ".installed-version.json"),
+      path.join(releaseDir, ".installed-version.json"),
       JSON.stringify({ version: versionId, tag, repo: options.repo, installedAt: new Date().toISOString() }, null, 2) + "\n",
       { mode: 0o600 }
     );
-    await runExecFile("mv", [stagingDir, path.join(versionsDir, versionId)]);
+    await runExecFile("mv", [releaseDir, path.join(releasesDir, versionId)]);
   } catch (error) {
     await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+    await rm(assembledDir, { recursive: true, force: true }).catch(() => {});
     throw error;
   }
 
   await switchCurrent(options.appRoot, versionId);
-  await runExecFile("systemctl", ["--user", "restart", options.unit]).catch(() => {});
-  if (await pollAppHealth(origin, options.fetchImpl)) {
+  const restarted = await runExecFile("systemctl", ["--user", "restart", options.unit]).then(() => true, () => false);
+  if (restarted && await pollAppHealth(origin, options.fetchImpl)) {
     await pruneVersions(options.appRoot, [versionId, await readLastKnownGoodVersionId(options.appRoot)].filter(Boolean));
     return { from: current, to: versionId, rolledBack: false };
   }
@@ -77,8 +94,11 @@ export async function updateApp(options) {
   const lkg = await readLastKnownGoodVersionId(options.appRoot);
   if (lkg && lkg !== versionId) {
     await switchCurrent(options.appRoot, lkg);
-    await runExecFile("systemctl", ["--user", "restart", options.unit]).catch(() => {});
-    await pollAppHealth(origin, options.fetchImpl).catch(() => {});
+    const recovered = await runExecFile("systemctl", ["--user", "restart", options.unit]).then(() => true, () => false);
+    if (!recovered || !(await pollAppHealth(origin, options.fetchImpl))) throw new Error("Update failed and the previous version did not recover. Run: vibedesktop status");
+    // Do not advertise the failed candidate as a known-good rollback target.
+    if (priorLkg && priorLkg !== lkg) await writeSecureJson(path.join(options.appRoot, "lkg.json"), {previous: priorLkg, updatedAt: new Date().toISOString()});
+    else await removeIfExists(path.join(options.appRoot, "lkg.json"));
     return { from: current, to: lkg, rolledBack: true };
   }
   throw new Error(`Vibe Desktop ${versionId} did not become healthy and no last-known-good version exists. Run: vibedesktop status`);
@@ -95,13 +115,18 @@ export async function rollbackApp(options) {
   if (!lkg) throw new Error("No last-known-good version is recorded. Nothing to roll back to.");
   const current = await readCurrentVersionId(options.appRoot);
   await switchCurrent(options.appRoot, lkg);
-  await runExecFile("systemctl", ["--user", "restart", options.unit]).catch(() => {});
-  await pollAppHealth(origin, options.fetchImpl).catch(() => {});
-  return { from: current, to: lkg };
+  const restarted = await runExecFile("systemctl", ["--user", "restart", options.unit]).then(() => true, () => false);
+  if (restarted && await pollAppHealth(origin, options.fetchImpl)) return { from: current, to: lkg };
+  if (current && current !== lkg) {
+    await switchCurrent(options.appRoot, current);
+    const recovered = await runExecFile("systemctl", ["--user", "restart", options.unit]).then(() => true, () => false);
+    if (recovered && await pollAppHealth(origin, options.fetchImpl)) throw new Error("Rollback failed; the version that was running before the request has been restored.");
+  }
+  throw new Error("Rollback failed and the service did not recover. Run: vibedesktop status");
 }
 
 /**
- * @param {{ appRoot: string; cliPath: string; runCliPath: string; unitPath: string; unit: string; dataDir?: string; purgeData?: boolean; confirmPurgeData?: boolean; execFileImpl?: typeof execFileAsync }} options
+ * @param {{ appRoot: string; cliPath: string; runCliPath: string; unitPath: string; desktopPath?: string; unit: string; dataDir?: string; purgeData?: boolean; confirmPurgeData?: boolean; execFileImpl?: typeof execFileAsync }} options
  * @returns {Promise<{ removed: string[]; dataPurged: boolean }>}
  */
 export async function uninstallApp(options) {
@@ -117,6 +142,7 @@ export async function uninstallApp(options) {
 
   if (await removeIfExists(options.cliPath)) removed.push(options.cliPath);
   if (await removeIfExists(options.runCliPath)) removed.push(options.runCliPath);
+  if (options.desktopPath && await removeIfExists(options.desktopPath)) removed.push(options.desktopPath);
 
   await removeRuntimeTree(options.appRoot);
   removed.push(options.appRoot);
@@ -184,17 +210,25 @@ if (isMain) {
   const unit = argValue(rest, "--unit") || DEFAULT_UNIT;
   const unitPath = argValue(rest, "--unit-path");
   const cliPath = argValue(rest, "--bin");
+  const desktopPath = argValue(rest, "--desktop-path");
   const tag = argValue(rest, "--tag");
   const npmPath = argValue(rest, "--npm") || "npm";
 
   const home = process.env.HOME || "";
   const dataHome = (process.env.XDG_DATA_HOME && path.isAbsolute(process.env.XDG_DATA_HOME))
     ? process.env.XDG_DATA_HOME : path.join(home, ".local", "share");
+  const configHome = (process.env.XDG_CONFIG_HOME && path.isAbsolute(process.env.XDG_CONFIG_HOME))
+    ? process.env.XDG_CONFIG_HOME : path.join(home, ".config");
+  const stateHome = (process.env.XDG_STATE_HOME && path.isAbsolute(process.env.XDG_STATE_HOME))
+    ? process.env.XDG_STATE_HOME : path.join(home, ".local", "state");
+  const binHome = (process.env.XDG_BIN_HOME && path.isAbsolute(process.env.XDG_BIN_HOME))
+    ? process.env.XDG_BIN_HOME : path.join(home, ".local", "bin");
   const defaultAppRoot = path.join(dataHome, "vibedesktop", "app");
-  const defaultUnitPath = path.join(home, ".config", "systemd", "user", DEFAULT_UNIT);
-  const defaultCliPath = path.join(home, ".local", "bin", "vibedesktop");
-  const defaultRunCliPath = path.join(home, ".local", "bin", "vibedesktop-run");
-  const defaultDataDir = path.join(dataHome, "vibedesktop-data");
+  const defaultUnitPath = path.join(configHome, "systemd", "user", DEFAULT_UNIT);
+  const defaultCliPath = path.join(binHome, "vibedesktop");
+  const defaultRunCliPath = path.join(binHome, "vibedesktop-run");
+  const defaultDataDir = path.join(stateHome, "vibedesktop");
+  const defaultDesktopPath = path.join(dataHome, "applications", "vibedesktop.desktop");
 
   const effectiveAppRoot = appRoot || defaultAppRoot;
   const effectiveUnitPath = unitPath || defaultUnitPath;
@@ -221,19 +255,20 @@ if (isMain) {
       cliPath: effectiveCliPath,
       runCliPath: defaultRunCliPath,
       unitPath: effectiveUnitPath,
+      desktopPath: desktopPath || defaultDesktopPath,
       unit,
       dataDir: defaultDataDir,
       purgeData: rest.includes(PURGE_FLAG),
       confirmPurgeData: rest.includes(PURGE_CONFIRMATION_FLAG),
     })
       .then((result) => {
-        console.log("Removed Vibe Desktop app, CLI, launcher, and unit.");
+        console.log("Removed Vibe Desktop app, CLI, launcher, desktop entry, and unit.");
         if (result.dataPurged) console.log("Local desktop state was also deleted, as explicitly requested.");
         else console.log(`Local desktop state was kept. Re-run with ${PURGE_FLAG} ${PURGE_CONFIRMATION_FLAG} to delete it too.`);
       })
       .catch((error) => { console.error(error instanceof Error ? error.message : "uninstall failed"); process.exitCode = 1; });
   } else {
-    console.error("Usage: app-lifecycle.mjs [update|rollback|uninstall] [--app-root PATH] [--repo URL] [--tag TAG] [--npm PATH] [--unit NAME] [--bin PATH] [--unit-path PATH]");
+    console.error("Usage: app-lifecycle.mjs [update|rollback|uninstall] [--app-root PATH] [--repo URL] [--tag TAG] [--npm PATH] [--unit NAME] [--bin PATH] [--unit-path PATH] [--desktop-path PATH]");
     process.exitCode = 2;
   }
 }

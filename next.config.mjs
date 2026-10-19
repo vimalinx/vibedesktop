@@ -14,15 +14,14 @@ const vibedRuntimeFiles = [
 ];
 
 const nextConfig = {
-  // No `output: "standalone"`. The product ships as a source checkout the owner
-  // runs with `npm run build && npm run start`, so the server reads its runtime
-  // and skill sources straight from the project directory. Standalone output was
-  // the packaging step of the removed Docker release path; it also broke
-  // `next start`, and nothing consumed the tree it produced.
-  //
-  // The tracing declarations below still describe which non-imported files each
-  // route needs at runtime, which is what any future container or platform build
-  // would have to copy.
+  devIndicators: false,
+  distDir: process.env.VIBE_BUILD_DIR || ".next",
+  // Release builds (VIBE_STANDALONE=1) emit Next's traced standalone server, which
+  // scripts/assemble-release.mjs turns into a slim installed release run with
+  // `node server.js`. Development, `npm run start`, and the e2e server keep the
+  // regular `next start` layout. The tracing declarations below list the
+  // non-imported files each route reads at runtime.
+  ...(process.env.VIBE_STANDALONE === "1" ? { output: "standalone" } : {}),
   outputFileTracingIncludes: {
     "/api/setup/add-app-skill": addAppSkillFiles,
     "/api/setup/vibed": vibedRuntimeFiles,

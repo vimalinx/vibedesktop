@@ -72,6 +72,7 @@ class Listener:
 
 
 SYSTEM_SKIP_PORTS: set[int] = {53, 631, 5353, 9050, 9222}
+MAX_ICON_BYTES = 256_000
 SKIP_PROC_NAMES: set[str] = {
     "chrome", "chromium", "google-chrome", "firefox", "brave",
     "agent-browser-l", "ssh", "sshd", "sing-box", "clash-verge",
@@ -93,7 +94,16 @@ JS_WEB_MARKERS: tuple[tuple[str, int], ...] = (
     ("astro", 4321),
     ("svelte", 5173),
     ("nuxt", 3000),
+    ("@angular/core", 4200),
+    ("gatsby", 8000),
+    ("@remix-run/dev", 3000),
+    ("@solidjs/start", 3000),
+    ("@builder.io/qwik-city", 5173),
 )
+
+JS_SCRIPT_PREFERENCES: dict[str, tuple[str, ...]] = {
+    "gatsby": ("develop", "dev", "start"),
+}
 
 JS_CONFIG_FILES: tuple[str, ...] = (
     "vite.config.ts", "vite.config.js", "vite.config.mjs", "vite.config.cjs",
@@ -132,6 +142,22 @@ CATALOG: tuple[KnownApp, ...] = (
     KnownApp("Streamlit", 8501,
              packages=("streamlit",), binaries=("streamlit",),
              command="", args=()),
+    KnownApp("Flowise", 3000,
+             binaries=("flowise",), command="flowise", args=("start",)),
+    KnownApp("Node-RED", 1880,
+             binaries=("node-red",), command="node-red", args=("--port", "1880")),
+    KnownApp("Home Assistant", 8123,
+             packages=("homeassistant",), binaries=("hass",), command="hass", args=()),
+    KnownApp("Gitea", 3000,
+             binaries=("gitea",), command="gitea", args=("web", "--port", "3000")),
+    KnownApp("Forgejo", 3000,
+             binaries=("forgejo",), command="forgejo", args=("web", "--port", "3000")),
+    KnownApp("File Browser", 8080,
+             binaries=("filebrowser",), command="filebrowser",
+             args=("--address", "127.0.0.1", "--port", "8080")),
+    KnownApp("Syncthing", 8384,
+             binaries=("syncthing",), command="syncthing",
+             args=("serve", "--no-browser", "--gui-address", "127.0.0.1:8384")),
 )
 
 
@@ -155,10 +181,21 @@ def find_project_root() -> Path | None:
 
 
 def daemon_data_dir(root: Path | None = None) -> Path:
-    """Resolve the installed daemon state first, with repo `.data` as a dev fallback."""
+    """Resolve the daemon endpoint runtime dir, retaining legacy fallbacks."""
+    runtime_override = os.environ.get("VIBE_DAEMON_RUNTIME_DIR", "").strip()
+    if runtime_override:
+        return Path(runtime_override).expanduser().resolve()
     override = os.environ.get("VIBE_DAEMON_DATA_DIR", "").strip()
     if override:
         return Path(override).expanduser().resolve()
+
+    configured_runtime_dir = os.environ.get("XDG_RUNTIME_DIR", "").strip()
+    if configured_runtime_dir:
+        runtime_dir = Path(configured_runtime_dir).expanduser()
+        if runtime_dir.is_absolute():
+            installed_runtime = runtime_dir / "vibed"
+            if (installed_runtime / "daemon.port").exists() or (installed_runtime / "daemon.token").exists():
+                return installed_runtime
 
     configured_data_home = os.environ.get("XDG_DATA_HOME", "").strip()
     data_home = Path(configured_data_home).expanduser() if configured_data_home else Path.home() / ".local" / "share"
@@ -485,10 +522,63 @@ def _find_app_target(project: Path, framework_pattern: str) -> tuple[str, str] |
     return None
 
 
+def _find_python_entry(project: Path, framework_pattern: str) -> Path | None:
+    """Find the first conventional Python entry file containing a WebUI marker."""
+    rx = re.compile(framework_pattern, re.IGNORECASE)
+    files = _iter_py_files(project)
+    preferred = ("app.py", "main.py", "webui.py", "ui.py", "dashboard.py")
+    ordered = sorted(files, key=lambda file: (
+        preferred.index(file.name) if file.name in preferred else len(preferred),
+        str(file),
+    ))
+    for file in ordered:
+        try:
+            if rx.search(file.read_text(errors="ignore")):
+                return file.relative_to(project)
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+def _python_tool(project: Path, name: str) -> str:
+    for venv in (".venv", "venv", "env"):
+        binary = project / venv / "bin" / name
+        if binary.exists():
+            return str(binary)
+    return name
+
+
 def _python_recipe(project: Path) -> tuple[str, list[str], int, str] | None:
     """Return (command, args, port, framework) for a Python webapp, or None."""
     deps = _python_deps_text(project)
     interp = _python_interpreter(project)
+
+    # Purpose-built WebUI frameworks must win over their transitive HTTP
+    # servers (many depend on FastAPI/Starlette internally).
+    if "chainlit" in deps:
+        entry = _find_python_entry(project, r"(?:import\s+chainlit|from\s+chainlit|@cl\.)")
+        if entry:
+            return (_python_tool(project, "chainlit"), ["run", str(entry), "--host", "127.0.0.1", "--port", "8000"], 8000, "chainlit")
+
+    if "gradio" in deps:
+        entry = _find_python_entry(project, r"(?:gr\.(?:Interface|Blocks)|gradio\.(?:Interface|Blocks))\s*\(")
+        if entry:
+            return (interp, [str(entry)], 7860, "gradio")
+
+    if "nicegui" in deps:
+        entry = _find_python_entry(project, r"(?:from\s+nicegui|import\s+nicegui|ui\.run\s*\()")
+        if entry:
+            return (interp, [str(entry)], 8080, "nicegui")
+
+    if re.search(r"(?:^|[\s\"'])dash(?:[<>=~!\s\"']|$)", deps):
+        entry = _find_python_entry(project, r"(?:Dash\s*\(|dash\.Dash\s*\()")
+        if entry:
+            return (interp, [str(entry)], 8050, "dash")
+
+    if re.search(r"(?:^|[\s\"'])panel(?:[<>=~!\s\"']|$)", deps):
+        entry = _find_python_entry(project, r"(?:import\s+panel|from\s+panel|\.servable\s*\()")
+        if entry:
+            return (_python_tool(project, "panel"), ["serve", str(entry), "--address", "127.0.0.1", "--port", "5006"], 5006, "panel")
 
     # Django: manage.py + django dep
     if (project / "manage.py").is_file() and "django" in deps:
@@ -584,7 +674,8 @@ def _recipe_in_dir(cdir: Path) -> StaticProject | None:
             scripts = data.get("scripts") or {}
             for marker, default_port in JS_WEB_MARKERS:
                 if marker in deps:
-                    script = "dev" if "dev" in scripts else ("start" if "start" in scripts else None)
+                    preferences = JS_SCRIPT_PREFERENCES.get(marker, ("dev", "start"))
+                    script = next((name for name in preferences if name in scripts), None)
                     if script:
                         configured_port = _configured_js_port(cdir, str(scripts.get(script) or ""))
                         port = configured_port or default_port
@@ -726,7 +817,7 @@ def fetch_app_icon(base_url: str, timeout: float = 3.0) -> tuple[bytes, str] | N
         # Reject non-image responses — a misconfigured app serves its HTML 404
         # page for /favicon.ico, which must not be embedded as an "icon".
         mime = (ct or _guess_mime(ext_hint)).split(";")[0].strip().lower()
-        if not mime.startswith("image/") or not blob:
+        if not mime.startswith("image/") or not blob or len(blob) > MAX_ICON_BYTES:
             return None
         return blob, mime
 

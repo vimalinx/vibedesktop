@@ -3,9 +3,9 @@ import { desktopThemes } from "@/lib/theme-data";
 
 /**
  * A style pack is data over the semantic token layer: token overrides plus a
- * handful of enumerated switches the shell reads as root data attributes. A
- * pack may not ship component CSS — anything a pack cannot express is a
- * missing token, and the fix is in the token layer.
+ * handful of enumerated switches the shell reads as root data attributes. These legacy theme
+ * presets affect the classic shell only. Full desktop packages use the separate
+ * shell API and may own arbitrary HTML, CSS, JavaScript and effects.
  */
 export interface StylePack {
   id: string;

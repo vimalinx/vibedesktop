@@ -50,18 +50,23 @@ npm --prefix /tmp/vibedesktop-public-review run release:verify
 After the staged commit has been reviewed, publishing the source snapshot is an explicit maintainer action:
 
 ```bash
-node scripts/publish-public.mjs --push
+node scripts/publish-public.mjs --push --tag v0.2.0
 ```
 
-`--push` force-replaces the public repository's intentionally single-commit history. It must never be run from automation or by an Agent without the maintainer explicitly authorising that external change.
+`--push` first clones the public `main`, replaces only its working tree with the
+reviewed allowlist, creates a normal child commit, creates the matching immutable
+tag on that sanitized commit, and atomically pushes `main` plus the tag. It never
+force-pushes and never pushes a tag from the private maintainer checkout. It must
+never be run from automation or by an Agent without the maintainer explicitly
+authorising that external change.
 
 ## Cut the GitHub Release
 
-The release tag must exactly equal `v` plus the version in `package.json`. For example, package version `0.1.4` uses tag `v0.1.4`:
+The release tag must exactly equal `v` plus the version in `package.json`. The
+sanitized publisher creates it together with the public-source commit:
 
 ```bash
-git tag -a v0.1.4 -m "Vibe Desktop v0.1.4"
-git push origin v0.1.4
+node scripts/publish-public.mjs --push --tag v0.2.0
 ```
 
 Pushing the tag runs `.github/workflows/release.yml`. The workflow repeats the full qualification with a disposable signing key, regenerates the final assets with the protected production key, validates their checksums and signature metadata, and creates or updates the GitHub Release.

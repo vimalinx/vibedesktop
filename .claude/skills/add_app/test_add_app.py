@@ -82,6 +82,57 @@ class AddAppRecipeTests(unittest.TestCase):
             self.assertEqual(len(recipes), 1)
             self.assertEqual(recipes[0].cwd, str(project))
 
+    def test_additional_js_webui_frameworks_are_detected(self) -> None:
+        fixtures = (
+            ("@angular/core", "start", 4200),
+            ("gatsby", "develop", 8000),
+            ("@remix-run/dev", "dev", 3000),
+            ("@solidjs/start", "dev", 3000),
+            ("@builder.io/qwik-city", "dev", 5173),
+        )
+        for dependency, script, expected_port in fixtures:
+            with self.subTest(dependency=dependency), tempfile.TemporaryDirectory() as temp:
+                project = Path(temp)
+                (project / "package.json").write_text(json.dumps({
+                    "scripts": {script: dependency},
+                    "dependencies": {dependency: "1.0.0"},
+                }))
+
+                recipe = scan.recipe_for_dir(project)
+
+                self.assertIsNotNone(recipe)
+                assert recipe is not None
+                self.assertEqual(recipe.framework, dependency)
+                self.assertEqual(recipe.port, expected_port)
+                self.assertEqual(recipe.args, ("run", script))
+
+    def test_additional_python_webui_frameworks_are_detected(self) -> None:
+        fixtures = (
+            ("chainlit", "import chainlit as cl\n@cl.on_message\nasync def main(message): pass\n", 8000, "chainlit"),
+            ("gradio", "import gradio as gr\ndemo = gr.Interface(lambda x: x, 'text', 'text')\ndemo.launch()\n", 7860, "gradio"),
+            ("nicegui", "from nicegui import ui\nui.label('hello')\nui.run()\n", 8080, "nicegui"),
+            ("dash", "from dash import Dash\napp = Dash(__name__)\napp.run()\n", 8050, "dash"),
+            ("panel", "import panel as pn\npn.panel('hello').servable()\n", 5006, "panel"),
+        )
+        for dependency, source, expected_port, framework in fixtures:
+            with self.subTest(dependency=dependency), tempfile.TemporaryDirectory() as temp:
+                project = Path(temp)
+                (project / "requirements.txt").write_text(f"{dependency}\n")
+                (project / "app.py").write_text(source)
+
+                recipe = scan.recipe_for_dir(project)
+
+                self.assertIsNotNone(recipe)
+                assert recipe is not None
+                self.assertEqual(recipe.framework, framework)
+                self.assertEqual(recipe.port, expected_port)
+
+    def test_new_framework_port_overrides_are_explicit(self) -> None:
+        self.assertEqual(add._port_override_args("@angular/core", 4300), ["--", "--port", "4300"])
+        self.assertEqual(add._port_override_args("@solidjs/start", 4301), [
+            "--", "--port", "4301", "--strictPort",
+        ])
+
 
 class ManagedBundleTests(unittest.TestCase):
     def test_writes_private_manifest_and_executable_wrapper(self) -> None:

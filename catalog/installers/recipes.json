@@ -1,0 +1,256 @@
+{
+  "schemaVersion": 1,
+  "recipes": [
+    {
+      "id": "github-n8n",
+      "title": "n8n",
+      "repositoryUrl": "https://github.com/n8n-io/n8n",
+      "sourceRef": "7700b7630d9d2391867c812bd762b5c93d3fb56d",
+      "kind": "container",
+      "port": 5678,
+      "containerPort": 5678,
+      "image": "docker.n8n.io/n8nio/n8n@sha256:a9e2e3c8006ed453238266669ea1274be7136f515abe290a2f75a0ab9044c93d",
+      "dataMounts": [{ "relativePath": "n8n", "containerPath": "/home/node/.n8n" }],
+      "environment": { "N8N_HOST": "127.0.0.1", "N8N_PORT": "5678", "N8N_PROTOCOL": "http" }
+    },
+    {
+      "id": "github-dify",
+      "title": "Dify",
+      "repositoryUrl": "https://github.com/langgenius/dify",
+      "sourceRef": "ce801f444541e7f7cdcb0da506af9038af0d9695",
+      "kind": "compose",
+      "port": 80,
+      "composeFile": "docker/docker-compose.yaml",
+      "envTemplate": "docker/.env.example",
+      "envTarget": "docker/.env",
+      "envOverrides": {
+        "SECRET_KEY": "$RANDOM_HEX_32",
+        "INIT_PASSWORD": "$RANDOM_HEX_16",
+        "EXPOSE_NGINX_PORT": "$PORT"
+      },
+      "portRules": [
+        { "service": "nginx", "containerPort": 80, "hostPort": "$PORT" },
+        { "service": "plugin_daemon", "disabled": true }
+      ],
+      "dataMounts": [
+        { "service": "local_sandbox", "relativePath": "local-sandbox-home", "containerPath": "/home/dify" },
+        { "service": "local_sandbox", "relativePath": "local-sandbox-workspace", "containerPath": "/workspace" }
+      ]
+    },
+    {
+      "id": "github-open-webui",
+      "title": "Open WebUI",
+      "repositoryUrl": "https://github.com/open-webui/open-webui",
+      "sourceRef": "2a960a59fe1dbbd35282f0556b3666d81102e781",
+      "kind": "container",
+      "port": 8080,
+      "containerPort": 8080,
+      "image": "ghcr.io/open-webui/open-webui@sha256:751b617714b91e4cfd0186a509c72480c858e012976103b09a30dad053c36175",
+      "dataMounts": [{ "relativePath": "open-webui", "containerPath": "/app/backend/data" }],
+      "environment": { "WEBUI_AUTH": "False", "WEBUI_SECRET_KEY": "$RANDOM_HEX_32" },
+      "extraHosts": ["host.docker.internal:host-gateway"]
+    },
+    {
+      "id": "github-excalidraw",
+      "title": "Excalidraw",
+      "repositoryUrl": "https://github.com/excalidraw/excalidraw",
+      "sourceRef": "e1bb9ff8f8931e783c11d104abb8967ac6605c9a",
+      "kind": "container",
+      "port": 3000,
+      "containerPort": 80,
+      "image": "excalidraw/excalidraw@sha256:f7ee194addd607bf831d2af0f0a34463dd4225e426cf35199ef0b12a803398e9"
+    },
+    {
+      "id": "github-immich",
+      "title": "Immich",
+      "repositoryUrl": "https://github.com/immich-app/immich",
+      "sourceRef": "5666d57f15a66bd5518119c5d9f4d2b62f3a86c1",
+      "kind": "compose",
+      "port": 2283,
+      "composeFile": "docker/docker-compose.yml",
+      "envTemplate": "docker/example.env",
+      "envTarget": "docker/.env",
+      "envOverrides": {
+        "UPLOAD_LOCATION": "$DATA/library",
+        "DB_DATA_LOCATION": "$DATA/postgres",
+        "DB_PASSWORD": "$RANDOM_HEX_32"
+      },
+      "portRules": [
+        { "service": "immich-server", "containerPort": 2283, "hostPort": "$PORT" }
+      ],
+      "dataMounts": [
+        { "service": "immich-machine-learning", "relativePath": "model-cache", "containerPath": "/cache" }
+      ]
+    },
+    {
+      "id": "github-stirling-pdf",
+      "title": "Stirling PDF",
+      "repositoryUrl": "https://github.com/Stirling-Tools/Stirling-PDF",
+      "sourceRef": "af97e1b27bca7ba84bfb7448a6fc3512f9873670",
+      "kind": "container",
+      "port": 8080,
+      "containerPort": 8080,
+      "image": "docker.stirlingpdf.com/stirlingtools/stirling-pdf@sha256:3b3670fce70b396ec56ba380a3cc7858e0abf83fe13f31c88f7737847763a396",
+      "dataMounts": [
+        { "relativePath": "tessdata", "containerPath": "/usr/share/tessdata" },
+        { "relativePath": "config", "containerPath": "/configs" },
+        { "relativePath": "logs", "containerPath": "/logs" }
+      ],
+      "environment": {
+        "DISABLE_ADDITIONAL_FEATURES": "true",
+        "SECURITY_ENABLELOGIN": "false",
+        "METRICS_ENABLED": "false",
+        "SYSTEM_GOOGLEVISIBILITY": "false",
+        "SHOW_SURVEY": "false"
+      },
+      "healthPath": "/api/v1/info/status"
+    },
+    {
+      "id": "github-uptime-kuma",
+      "title": "Uptime Kuma",
+      "repositoryUrl": "https://github.com/louislam/uptime-kuma",
+      "sourceRef": "013c381fc2a9553573558673748fc56126f61928",
+      "kind": "container",
+      "port": 3001,
+      "containerPort": 3001,
+      "image": "louislam/uptime-kuma@sha256:3e24e96c89efff0e3a4b0698cbdd36c15ad3022371db57166e5588853002ee5c",
+      "dataMounts": [{ "relativePath": "uptime-kuma", "containerPath": "/app/data" }]
+    },
+    {
+      "id": "github-anything-llm",
+      "title": "AnythingLLM",
+      "repositoryUrl": "https://github.com/Mintplex-Labs/anything-llm",
+      "sourceRef": "bbefbc7f75f8227327242d8c5ef0b9c15577751b",
+      "kind": "container",
+      "port": 3001,
+      "containerPort": 3001,
+      "image": "mintplexlabs/anythingllm@sha256:055e68cfcd30949452651add038cf95177534ceffb9bc0d6f68be20b76ed6b7a",
+      "dataMounts": [
+        { "relativePath": "storage", "containerPath": "/app/server/storage" },
+        { "relativePath": "hotdir", "containerPath": "/app/collector/hotdir" },
+        { "relativePath": "outputs", "containerPath": "/app/collector/outputs" }
+      ],
+      "dockerArgs": ["--cap-add", "SYS_ADMIN"],
+      "extraHosts": ["host.docker.internal:host-gateway"]
+    },
+    {
+      "id": "github-memos",
+      "title": "Memos",
+      "repositoryUrl": "https://github.com/usememos/memos",
+      "sourceRef": "de843f658a8d06badb87784e6b70ea32c6a6ee03",
+      "kind": "container",
+      "port": 5230,
+      "containerPort": 5230,
+      "image": "neosmemo/memos@sha256:71a5b4738d1bed96e92112004054f0888e92791b64eb78afd79077c96e6f9327",
+      "dataMounts": [{ "relativePath": "memos", "containerPath": "/var/opt/memos" }]
+    },
+    {
+      "id": "github-penpot",
+      "title": "Penpot",
+      "repositoryUrl": "https://github.com/penpot/penpot",
+      "sourceRef": "5b3a1d93603cb14ce0f584cb462050895a6c5c3a",
+      "kind": "compose",
+      "port": 9001,
+      "composeFile": "docker/images/docker-compose.yaml",
+      "portRules": [
+        { "service": "penpot-frontend", "containerPort": 8080, "hostPort": "$PORT" },
+        { "service": "penpot-mailcatch", "disabled": true }
+      ],
+      "dataMounts": [
+        { "service": "penpot-frontend", "relativePath": "assets", "containerPath": "/opt/data/assets" },
+        { "service": "penpot-backend", "relativePath": "assets", "containerPath": "/opt/data/assets" },
+        { "service": "penpot-postgres", "relativePath": "postgres", "containerPath": "/var/lib/postgresql/data" }
+      ],
+      "serviceEnvironment": {
+        "penpot-frontend": { "PENPOT_PUBLIC_URI": "http://127.0.0.1:$PORT" },
+        "penpot-backend": { "PENPOT_PUBLIC_URI": "http://127.0.0.1:$PORT", "PENPOT_SECRET_KEY": "$SECRET_PENPOT", "PENPOT_TELEMETRY_ENABLED": "false" },
+        "penpot-exporter": { "PENPOT_PUBLIC_URI": "http://127.0.0.1:$PORT", "PENPOT_SECRET_KEY": "$SECRET_PENPOT" }
+      }
+    },
+    {
+      "id": "github-appsmith",
+      "title": "Appsmith",
+      "repositoryUrl": "https://github.com/appsmithorg/appsmith",
+      "sourceRef": "75847cf6137fa3e78a64519b2e4b4c74dbd262ef",
+      "kind": "container",
+      "port": 80,
+      "containerPort": 80,
+      "image": "index.docker.io/appsmith/appsmith-ce@sha256:738d253269f4a16fe6bff1d9d5ebc35bdc473d9c973b36480479a8376260c6c0",
+      "dataMounts": [{ "relativePath": "stacks", "containerPath": "/appsmith-stacks" }],
+      "environment": { "APPSMITH_ENCRYPTION_PASSWORD": "$RANDOM_HEX_32", "APPSMITH_ENCRYPTION_SALT": "$RANDOM_HEX_16" }
+    },
+    {
+      "id": "github-actual-budget",
+      "title": "Actual Budget",
+      "repositoryUrl": "https://github.com/actualbudget/actual",
+      "sourceRef": "f0e98075a1eba4bb7f3bbb40297c22e49f4bb5f8",
+      "kind": "container",
+      "port": 5006,
+      "containerPort": 5006,
+      "image": "actualbudget/actual-server@sha256:6478d9ddfc0924479c09e6699c205e354c6f2216dfe7de3c0fb7b590d6edcdc5",
+      "dataMounts": [{ "relativePath": "actual", "containerPath": "/data" }]
+    },
+    {
+      "id": "github-flowise",
+      "title": "Flowise",
+      "repositoryUrl": "https://github.com/FlowiseAI/Flowise",
+      "sourceRef": "9291856d1ea4a4ceea9f8fef8ce14f4f6c81e8eb",
+      "kind": "container",
+      "port": 3000,
+      "containerPort": 3000,
+      "image": "flowiseai/flowise@sha256:cf880b17b1290fbaebebc76c33954bde67b3775aff95feec72a1d060cc81e43d",
+      "dataMounts": [{ "relativePath": "flowise", "containerPath": "/home/node/.flowise" }],
+      "environment": { "PORT": "3000", "DISABLE_FLOWISE_TELEMETRY": "true" },
+      "command": ["flowise", "start"]
+    },
+    {
+      "id": "github-librechat",
+      "title": "LibreChat",
+      "repositoryUrl": "https://github.com/danny-avila/LibreChat",
+      "sourceRef": "49e1e32f3a41b8e718feaa818e0134d5d0d70ae5",
+      "kind": "compose",
+      "port": 3080,
+      "composeFile": "docker-compose.yml",
+      "envTemplate": ".env.example",
+      "envTarget": ".env",
+      "envOverrides": {
+        "PORT": "$PORT",
+        "UID": "$UID",
+        "GID": "$GID",
+        "ADMIN_PANEL_SESSION_SECRET": "$RANDOM_HEX_32",
+        "CREDS_KEY": "$RANDOM_HEX_32",
+        "CREDS_IV": "$RANDOM_HEX_16",
+        "MEILI_MASTER_KEY": "$RANDOM_HEX_32",
+        "JWT_SECRET": "$RANDOM_HEX_32",
+        "JWT_REFRESH_SECRET": "$RANDOM_HEX_32"
+      },
+      "portRules": [
+        { "service": "api", "containerPort": 3080, "hostPort": "$PORT" },
+        { "service": "admin-panel", "disabled": true }
+      ],
+      "dataMounts": [
+        { "service": "api", "relativePath": "librechat", "containerPath": "/app/data" },
+        { "service": "vectordb", "relativePath": "postgres", "containerPath": "/var/lib/postgresql/data" }
+      ]
+    },
+    {
+      "id": "github-comfyui",
+      "title": "ComfyUI",
+      "repositoryUrl": "https://github.com/Comfy-Org/ComfyUI",
+      "sourceRef": "d3eaf6adb388c27245374ac26e585fef4936c485",
+      "kind": "python",
+      "pythonMode": "comfyui",
+      "port": 8188
+    },
+    {
+      "id": "github-chainlit",
+      "title": "Chainlit",
+      "repositoryUrl": "https://github.com/Chainlit/chainlit",
+      "sourceRef": "190ea74239d9e84b26e7c91bc2882dd038942564",
+      "kind": "python",
+      "pythonMode": "chainlit",
+      "pythonPackage": "chainlit==2.12.0",
+      "port": 8000
+    }
+  ]
+}

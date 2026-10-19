@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -7,11 +7,13 @@ const html = readFileSync(path.join(siteRoot, "index.html"), "utf8");
 const css = readFileSync(path.join(siteRoot, "styles.css"), "utf8");
 const script = readFileSync(path.join(siteRoot, "app.js"), "utf8");
 const headers = readFileSync(path.join(siteRoot, "_headers"), "utf8");
+const publisherPath = path.join(process.cwd(), "scripts", "publish-public.mjs");
+const publisher = existsSync(publisherPath) ? readFileSync(publisherPath, "utf8") : null;
 
 describe("public product site contract", () => {
-  it("points installation and release actions at the public v0.1.8 repository", () => {
+  it("points installation and source actions at the public repository", () => {
     expect(html).toContain("releases/latest/download/install-app.sh | sh");
-    expect(html).toContain("releases/tag/v0.1.8");
+    expect(html).toContain("https://github.com/vimalinx/vibedesktop");
     expect(html).toContain("github.com/vimalinx/vibedesktop");
   });
 
@@ -30,5 +32,12 @@ describe("public product site contract", () => {
     expect(css).toContain(":focus-visible");
     expect(html).toContain('role="status" aria-live="polite"');
     expect(script).toContain("navigator.clipboard.writeText");
+  });
+
+  it.runIf(publisher !== null)("publishes a sanitized append-only commit and tag without rewriting public history", () => {
+    expect(publisher).toContain("--push --tag v1.2.3");
+    expect(publisher).toContain('git("push", "--atomic"');
+    expect(publisher).toContain("public tag ${tag} already exists; release tags are immutable");
+    expect(publisher).not.toContain('git("push", "--force"');
   });
 });

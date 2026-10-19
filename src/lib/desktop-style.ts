@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { Desktop, DesktopPayload } from "@/lib/contracts";
+import type { Desktop, DesktopPayload, WallpaperFit } from "@/lib/contracts";
 import { accentBase, surfaceRaised2 } from "@/lib/design-tokens";
 import {
   readLocalJson,
@@ -24,6 +24,14 @@ export interface DesktopStyleResolution {
   dataAttributes: Record<string, string>;
 }
 
+export function wallpaperFitStyle(fit: WallpaperFit): Pick<CSSProperties, "backgroundSize" | "backgroundPosition" | "backgroundRepeat"> {
+  return {
+    backgroundSize: fit === "stretch" ? "100% 100%" : fit === "center" ? "auto" : fit,
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat"
+  };
+}
+
 export function resolveDesktopStyle(
   payload: DesktopPayload,
   localWallpaper: string | undefined
@@ -31,8 +39,9 @@ export function resolveDesktopStyle(
   const desktop: Desktop = payload.desktop;
   const wallpaper = resolveWallpaper(payload.wallpapers, desktop.wallpaperBuiltinId);
   const pack = resolveStylePack(desktop.themeId);
+  const customWallpaperActive = desktop.wallpaperKind === "custom_local" && Boolean(localWallpaper);
   const background =
-    desktop.wallpaperKind === "custom_local" && localWallpaper
+    customWallpaperActive
       ? `url(${localWallpaper})`
       : wallpaperDrivesBackground(desktop)
         ? wallpaper.cssValue
@@ -42,6 +51,7 @@ export function resolveDesktopStyle(
     className: `desktop theme-${desktop.themeId} shell-${desktop.shellStyle} grain-overlay`,
     style: {
       backgroundImage: background,
+      ...(customWallpaperActive ? wallpaperFitStyle(desktop.wallpaperFit) : {}),
       "--theme-accent": pack.tokens["--theme-accent"] ?? accentBase,
       "--theme-accent-2": pack.tokens["--theme-accent-2"] ?? surfaceRaised2,
       ...pack.tokens,

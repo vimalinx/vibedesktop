@@ -19,7 +19,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const user = await requireCurrentUser();
     const { id } = await context.params;
-    const body = (await request.json()) as {
+    const body = (await request.json().catch(() => null)) as {
       title?: string;
       url?: string | null;
       description?: string | null;
@@ -31,7 +31,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       spanColumns?: number;
       spanRows?: number;
       tileVariant?: string;
-    };
+    } | null;
+    if (!body || typeof body !== "object" || Array.isArray(body)) return apiError(400, "invalid_json", "A JSON object is required.");
     const payload = await updateDesktopApp(user, id, {
       title: body.title,
       url: body.url,

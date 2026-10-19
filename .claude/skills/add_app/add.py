@@ -2,6 +2,7 @@
 """Detect, generate, register, and optionally verify one managed WebUI bundle."""
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sys
@@ -15,6 +16,29 @@ if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 import manager  # noqa: E402
 import scan  # noqa: E402
+
+
+class AlreadyRegistered(Exception):
+    """The target is already managed; re-adding it would duplicate the icon."""
+
+
+def split_options(argv: list[str]) -> tuple[list[str], bool, str | None]:
+    """Remove `--json` and `--name <name>`; the rest is the positional target and mode flags."""
+    rest: list[str] = []
+    name: str | None = None
+    as_json = False
+    index = 0
+    while index < len(argv):
+        arg = argv[index]
+        if arg == "--json":
+            as_json = True
+        elif arg == "--name" and index + 1 < len(argv):
+            name = argv[index + 1].strip() or None
+            index += 1
+        else:
+            rest.append(arg)
+        index += 1
+    return rest, as_json, name
 
 
 def parse_target(argv: list[str]) -> tuple[tuple[str, object], bool, bool]:
@@ -85,17 +109,21 @@ def _daemon():
     return root, endpoint
 
 
-def _find_free_port(start: int, busy: set[int], ceiling: int = 3999) -> int | None:
-    for port in range(start, ceiling + 1):
+def _find_free_port(start: int, busy: set[int], span: int = 1000) -> int | None:
+    """First port at or after `start` that nothing listens on or has registered."""
+    for port in range(start, min(start + span, 65536)):
         if port not in busy:
             return port
     return None
 
 
 def _port_override_args(framework: str, port: int) -> list[str]:
-    if framework == "vite":
+    if framework in {"vite", "@solidjs/start", "@builder.io/qwik-city"}:
         return ["--", "--port", str(port), "--strictPort"]
-    if framework in {"next", "astro", "svelte", "nuxt", "@vue/devserver"}:
+    if framework in {
+        "next", "astro", "svelte", "nuxt", "@vue/devserver",
+        "@angular/core", "gatsby", "@remix-run/dev",
+    }:
         return ["--", "--port", str(port)]
     return []
 
@@ -109,25 +137,27 @@ def prepare(bundle: dict, target_kind: str) -> dict | None:
 
     if bundle["projectRoot"] in registered_cwds:
         existing = next(app for app in apps if app.get("cwd") == bundle["projectRoot"])
-        print(f"→ already registered as '{existing.get('name')}' on :{existing.get('port')} — not re-adding.")
-        return None
+        raise AlreadyRegistered(
+            f"already registered as '{existing.get('name')}' on :{existing.get('port')} — not re-adding."
+        )
 
     prepared = {
         **bundle,
         "services": [{**service, "args": list(service.get("args") or [])} for service in bundle["services"]],
     }
+    notes: list[str] = []
     allocated = listening | registered_ports
     for index, service in enumerate(prepared["services"]):
         port = int(service["port"])
         if port in registered_ports:
-            print(f"→ port {port} already registered — not re-adding.")
-            return None
+            raise AlreadyRegistered(f"port {port} already registered — not re-adding.")
         if target_kind != "port" and port in allocated:
             if index == 0 and service["command"] == "npm":
                 free = _find_free_port(max(3000, port), allocated)
                 if not free:
                     raise ValueError(f"no free managed port is available after {port}")
-                print(f"→ primary port {port} busy → using {free}")
+                notes.append(f"primary port {port} busy → using {free}")
+                print(f"→ {notes[-1]}")
                 service["port"] = free
                 port = free
             else:
@@ -136,14 +166,13 @@ def prepare(bundle: dict, target_kind: str) -> dict | None:
                     "stop the external service or configure another port"
                 )
         if target_kind == "port" and port in listening:
-            print(
-                f"⚠ :{port} is currently owned by an external process; stop it before starting the managed copy.",
-                file=sys.stderr,
-            )
+            notes.append(f":{port} is currently owned by an external process; stop it before starting the managed copy.")
+            print(f"⚠ {notes[-1]}", file=sys.stderr)
         if target_kind != "port" and service["command"] == "npm":
             service["args"] += _port_override_args(str(service.get("framework") or ""), port)
         allocated.add(port)
 
+    prepared["_notes"] = notes
     prepared["_daemon"] = {"port": daemon_port, "token": token}
     prepared["_listening"] = listening
     return prepared
@@ -238,57 +267,92 @@ def rollback_registration(app_id: str, manifest_path: Path) -> None:
         manager.remove_bundle(manifest_path)
 
 
-def main() -> int:
-    (kind, value), start, plan_only = parse_target(sys.argv[1:])
+def public_plan(prepared: dict) -> dict:
+    public = {key: value for key, value in prepared.items() if not key.startswith("_")}
+    public["bundleDir"] = str(manager.bundle_dir(public["name"], public["projectRoot"]))
+    public["notes"] = list(prepared.get("_notes") or [])
+    return public
+
+
+def execute(argv: list[str], name: str | None = None) -> tuple[int, dict]:
+    """Run one add request; human progress goes to stdout, the result is returned for `--json`."""
+    if "--plan" in argv:
+        return _execute(argv, name)
+    with manager.import_lock():
+        return _execute(argv, name)
+
+
+def _execute(argv: list[str], name: str | None = None) -> tuple[int, dict]:
+    (kind, value), start, plan_only = parse_target(argv)
     bundle, source = resolve(kind, value)
     if not bundle:
         print(f"✗ {source}")
-        return 1
+        return 1, {"ok": False, "status": "not_detected", "message": source}
+    if name:
+        bundle = {**bundle, "name": name}
     print(f"detected via {source}:")
     try:
         prepared = prepare(bundle, kind)
+    except AlreadyRegistered as error:
+        print(f"→ {error}")
+        return 0, {"ok": False, "status": "already_registered", "message": str(error)}
     except ValueError as error:
         print(f"✗ {error}", file=sys.stderr)
-        return 1
-    if not prepared:
-        return 0
+        return 1, {"ok": False, "status": "conflict", "message": str(error)}
     for service in prepared["services"]:
         print(f"  [{service['name']}] :{service['port']}  {service['command']} {' '.join(service['args'])}")
 
+    plan = public_plan(prepared)
     if plan_only:
-        public = {key: value for key, value in prepared.items() if not key.startswith("_")}
-        public["bundleDir"] = str(manager.bundle_dir(public["name"], public["projectRoot"]))
-        print(json.dumps(public, indent=2, ensure_ascii=False))
-        return 0
+        print(json.dumps(plan, indent=2, ensure_ascii=False))
+        return 0, {"ok": True, "status": "planned", "plan": plan}
 
     try:
         response, manifest_path = register(prepared)
     except urllib.error.HTTPError as error:
-        print(f"✗ daemon rejected: {error.code} {error.read().decode('utf-8', 'replace')}", file=sys.stderr)
-        return 1
+        message = f"daemon rejected: {error.code} {error.read().decode('utf-8', 'replace')}"
+        print(f"✗ {message}", file=sys.stderr)
+        return 1, {"ok": False, "status": "failed", "message": message, "plan": plan}
     except Exception as error:
         print(f"✗ registration failed: {error}", file=sys.stderr)
-        return 1
+        return 1, {"ok": False, "status": "failed", "message": f"registration failed: {error}", "plan": plan}
+    app_id = str(response.get("id", ""))
+    registered = {"appId": app_id, "manifestPath": str(manifest_path), "plan": plan}
     print(f"✓ managed bundle: {manifest_path}")
-    print(f"✓ registered (restart=on-crash). icon on desktop within ~5s. id={response.get('id', '')[:8]}")
+    print(f"✓ registered (restart=on-crash). icon on desktop within ~5s. id={app_id[:8]}")
     if not start:
         print("  single-click the icon to launch it inside Vibe Desktop; pass --start to launch now")
-        return 0
+        return 0, {"ok": True, "status": "registered", **registered}
 
     if not control(response["id"], "start"):
         rollback_registration(response["id"], manifest_path)
         print("✗ start failed; registration and generated bundle rolled back", file=sys.stderr)
-        return 1
+        return 1, {"ok": False, "status": "rolled_back", "message": "start failed", "plan": plan}
     status = wait_for_healthy(response["id"])
     if not status or status.get("healthy") is not True:
         url = status.get("url") if status else f"http://localhost:{prepared['services'][0]['port']}"
-        detail = status.get("lastError") if status else "status unavailable"
+        detail = (status.get("lastError") if status else "status unavailable") or "health probe failed"
         rollback_registration(response["id"], manifest_path)
-        print(f"✗ unhealthy at {url}: {detail or 'health probe failed'}", file=sys.stderr)
+        print(f"✗ unhealthy at {url}: {detail}", file=sys.stderr)
         print("  registration and generated bundle rolled back", file=sys.stderr)
-        return 1
+        return 1, {"ok": False, "status": "rolled_back", "message": f"unhealthy at {url}: {detail}", "plan": plan}
     print(f"  start verified → healthy at {status.get('url')}")
-    return 0
+    return 0, {"ok": True, "status": "started", "url": status.get("url"), **registered}
+
+
+def main() -> int:
+    argv, as_json, name = split_options(sys.argv[1:])
+    if not as_json:
+        return execute(argv, name)[0]
+    # Machine mode: stdout carries exactly one JSON document; progress moves to stderr.
+    with contextlib.redirect_stdout(sys.stderr):
+        try:
+            code, result = execute(argv, name)
+        except SystemExit as error:
+            code = int(error.code or 1)
+            result = {"ok": False, "status": "daemon_unreachable", "message": "vibed is not reachable"}
+    print(json.dumps(result, ensure_ascii=False))
+    return code
 
 
 if __name__ == "__main__":

@@ -1,0 +1,11 @@
+{
+  "format": "vibedesktop-package",
+  "manifestVersion": 1,
+  "id": "org.example.aurora-desktop",
+  "name": "Aurora Lab",
+  "version": "1.0.0",
+  "protocol": { "major": 1, "minMinor": 0 },
+  "requiredCapabilities": ["desktop", "packages.preferences"],
+  "optionalCapabilities": ["localApps"],
+  "preferencesSchemaVersion": 1
+}

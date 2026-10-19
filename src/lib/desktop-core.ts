@@ -108,7 +108,7 @@ export function getDesktopPayload(store: StoreShape, user: VibeUser): DesktopPay
 export type DesktopUpdates = Partial<
   Pick<
     Desktop,
-    "wallpaperKind" | "wallpaperBuiltinId" | "startAppId" | "themeId" | "shellStyle" | "accentOverride" | "fontOverride"
+    "wallpaperKind" | "wallpaperBuiltinId" | "wallpaperFit" | "startAppId" | "themeId" | "shellStyle" | "accentOverride" | "fontOverride"
   >
 >;
 
@@ -128,6 +128,10 @@ export function updateDesktop(store: StoreShape, user: VibeUser, updates: Deskto
 
   if (updates.wallpaperBuiltinId) {
     desktop.wallpaperBuiltinId = updates.wallpaperBuiltinId;
+  }
+
+  if (updates.wallpaperFit && ["cover", "contain", "stretch", "center"].includes(updates.wallpaperFit)) {
+    desktop.wallpaperFit = updates.wallpaperFit;
   }
 
   if (updates.startAppId !== undefined) {
@@ -207,7 +211,7 @@ export function addDirectoryApp(store: StoreShape, user: VibeUser, directoryApp:
     url: directoryApp.url,
     description: directoryApp.description,
     openingMode: directoryApp.openingMode,
-    iconKind: "favicon",
+    iconKind: directoryApp.iconUrl ? "favicon" : "fallback",
     iconUrl: directoryApp.iconUrl,
     gridX: position.gridX,
     gridY: position.gridY,
@@ -288,6 +292,7 @@ export function ensureDesktop(store: StoreShape, userId: string): { desktop: Des
     userId,
     wallpaperKind: "builtin",
     wallpaperBuiltinId: "noir-dawn",
+    wallpaperFit: "cover",
     startAppId: null,
     themeId: "mineral",
     shellStyle: "glass",
@@ -432,6 +437,7 @@ function normalizeDesktop(desktop: Desktop): Desktop {
     ...desktop,
     wallpaperKind: desktop.wallpaperKind === "custom_local" ? "custom_local" : "builtin",
     wallpaperBuiltinId: typeof desktop.wallpaperBuiltinId === "string" ? desktop.wallpaperBuiltinId : "noir-dawn",
+    wallpaperFit: ["cover", "contain", "stretch", "center"].includes(desktop.wallpaperFit) ? desktop.wallpaperFit : "cover",
     startAppId: typeof desktop.startAppId === "string" ? desktop.startAppId : null,
     themeId: desktopThemes.some((theme) => theme.id === desktop.themeId) ? desktop.themeId : "mineral",
     shellStyle: shellStyleOptions.some((style) => style.id === desktop.shellStyle) ? desktop.shellStyle : "glass",

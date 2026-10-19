@@ -184,6 +184,17 @@ describe("store — desktop settings", () => {
     expect(ignored.desktop.shellStyle).toBe("compact");
   });
 
+  it("persists supported wallpaper fit modes and ignores unknown ones", async () => {
+    const user = await store.getOrCreateUser(identity);
+    await store.getDesktopPayload(user);
+
+    const fitted = await store.updateDesktop(user, { wallpaperFit: "contain" });
+    expect(fitted.desktop.wallpaperFit).toBe("contain");
+
+    const ignored = await store.updateDesktop(user, { wallpaperFit: "tile" as never });
+    expect(ignored.desktop.wallpaperFit).toBe("contain");
+  });
+
   it("only accepts a startAppId that belongs to this desktop", async () => {
     const user = await store.getOrCreateUser(identity);
     const created = await store.createDesktopApp(user, {
@@ -207,5 +218,31 @@ describe("store — desktop settings", () => {
 
     const rejected = await store.updateDesktop(user, { startAppId: "foreign-id" });
     expect(rejected.desktop.startAppId).toBeNull();
+  });
+});
+
+describe("store — concurrent transactions", () => {
+  it("retains every successful write while reads and identity requests overlap", async () => {
+    const user = await store.getOrCreateUser(identity);
+    const initial = await store.getDesktopPayload(user);
+    await Promise.all(Array.from({ length: 24 }, async (_, index) => {
+      await Promise.all([store.getDesktopPayload(user), store.getOrCreateUser(identity)]);
+      await store.createDesktopApp(user, { kind: "url", source: "user", title: `Concurrent ${index}`,
+        url: `https://example.com/${index}`, description: null, openingMode: "desktop_window", iconKind: "fallback", iconUrl: null });
+    }));
+    const final = await store.getDesktopPayload(user);
+    expect(final.apps.length - initial.apps.length).toBe(24);
+    expect(new Set(final.apps.map(a => a.id)).size).toBe(final.apps.length);
+  });
+
+  it("continues after a rejected transaction and restores snapshots under the current owner", async () => {
+    const user = await store.getOrCreateUser(identity);
+    const original = await store.getDesktopPayload(user);
+    await expect(store.updateDesktopApp(user, "missing", { title: "no" })).rejects.toThrow();
+    await store.updateDesktop(user, { themeId: "paper-ink" });
+    const restored = await store.restoreDesktop(user, original);
+    expect(restored.desktop.themeId).toBe(original.desktop.themeId);
+    expect(restored.desktop.userId).toBe(user.id);
+    expect(restored.apps).toEqual(original.apps);
   });
 });

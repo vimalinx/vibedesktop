@@ -1,5 +1,6 @@
 import type { AppDirectoryItem, BuiltinWallpaper, DesktopApp, OpeningMode } from "@/lib/contracts";
 import { desktopGridMinColumns, maxGridXForSpan, weatherWidgetGridSpan, type DesktopGridSpan } from "@/lib/desktop-grid";
+import { catalogIconUrl } from "@/lib/catalog-icons";
 
 export const builtinWallpapers: BuiltinWallpaper[] = [
   {
@@ -52,7 +53,7 @@ export const appDirectory: AppDirectoryItem[] = [
     title: "ChatGPT",
     url: "https://chatgpt.com",
     description: "OpenAI's general AI assistant.",
-    iconUrl: "https://icons.duckduckgo.com/ip3/chatgpt.com.ico",
+    iconUrl: catalogIconUrl("chatgpt", "ChatGPT"),
     openingMode: "desktop_window",
     category: "global-ai",
     catalogKind: "website"
@@ -62,7 +63,7 @@ export const appDirectory: AppDirectoryItem[] = [
     title: "Claude",
     url: "https://claude.ai",
     description: "Anthropic's AI assistant.",
-    iconUrl: "https://icons.duckduckgo.com/ip3/claude.ai.ico",
+    iconUrl: catalogIconUrl("claude", "Claude"),
     openingMode: "desktop_window",
     category: "global-ai",
     catalogKind: "website"
@@ -72,7 +73,7 @@ export const appDirectory: AppDirectoryItem[] = [
     title: "DeepSeek",
     url: "https://chat.deepseek.com",
     description: "DeepSeek chat for coding and reasoning.",
-    iconUrl: "https://icons.duckduckgo.com/ip3/deepseek.com.ico",
+    iconUrl: catalogIconUrl("deepseek", "DeepSeek"),
     openingMode: "desktop_window",
     category: "china-ai",
     catalogKind: "website"
@@ -82,7 +83,7 @@ export const appDirectory: AppDirectoryItem[] = [
     title: "Kimi",
     url: "https://kimi.moonshot.cn",
     description: "Moonshot AI's long-context assistant.",
-    iconUrl: "https://icons.duckduckgo.com/ip3/kimi.moonshot.cn.ico",
+    iconUrl: catalogIconUrl("kimi", "Kimi"),
     openingMode: "desktop_window",
     category: "china-ai",
     catalogKind: "website"
@@ -92,7 +93,7 @@ export const appDirectory: AppDirectoryItem[] = [
     title: "Doubao",
     url: "https://www.doubao.com",
     description: "ByteDance's AI assistant.",
-    iconUrl: "https://icons.duckduckgo.com/ip3/doubao.com.ico",
+    iconUrl: catalogIconUrl("doubao", "Doubao"),
     openingMode: "desktop_window",
     category: "china-ai",
     catalogKind: "website"
@@ -102,7 +103,7 @@ export const appDirectory: AppDirectoryItem[] = [
     title: "Qwen",
     url: "https://chat.qwen.ai",
     description: "Alibaba Qwen chat.",
-    iconUrl: "https://icons.duckduckgo.com/ip3/chat.qwen.ai.ico",
+    iconUrl: catalogIconUrl("qwen", "Qwen"),
     openingMode: "desktop_window",
     category: "china-ai",
     catalogKind: "website"
@@ -112,7 +113,7 @@ export const appDirectory: AppDirectoryItem[] = [
     title: "Tencent Yuanbao",
     url: "https://yuanbao.tencent.com",
     description: "Tencent Yuanbao AI assistant.",
-    iconUrl: "https://icons.duckduckgo.com/ip3/yuanbao.tencent.com.ico",
+    iconUrl: catalogIconUrl("yuanbao", "Tencent Yuanbao"),
     openingMode: "desktop_window",
     category: "china-ai",
     catalogKind: "website"
@@ -122,7 +123,7 @@ export const appDirectory: AppDirectoryItem[] = [
     title: "Wenxin",
     url: "https://yiyan.baidu.com",
     description: "Baidu Wenxin/ERNIE assistant.",
-    iconUrl: "https://icons.duckduckgo.com/ip3/yiyan.baidu.com.ico",
+    iconUrl: catalogIconUrl("wenxin", "Wenxin"),
     openingMode: "desktop_window",
     category: "china-ai",
     catalogKind: "website"
@@ -132,7 +133,7 @@ export const appDirectory: AppDirectoryItem[] = [
     title: "n8n",
     url: "https://n8n.io",
     description: "Visual workflow automation with AI and 400+ integrations.",
-    iconUrl: "",
+    iconUrl: catalogIconUrl("github-n8n", "n8n"),
     openingMode: "external_tab",
     category: "automation",
     catalogKind: "github_app",
@@ -140,14 +141,16 @@ export const appDirectory: AppDirectoryItem[] = [
     stars: 202736,
     language: "TypeScript",
     license: "NOASSERTION",
-    verifiedAt: "2026-08-29"
+    verifiedAt: "2026-08-29",
+    selfHosted: true,
+    defaultPort: 5678
   },
   {
     id: "github-dify",
     title: "Dify",
     url: "https://dify.ai",
     description: "Build agentic workflows and RAG pipelines in one workspace.",
-    iconUrl: "",
+    iconUrl: catalogIconUrl("github-dify", "Dify"),
     openingMode: "external_tab",
     category: "ai-platforms",
     catalogKind: "github_app",
@@ -155,14 +158,16 @@ export const appDirectory: AppDirectoryItem[] = [
     stars: 153791,
     language: "TypeScript",
     license: "NOASSERTION",
-    verifiedAt: "2026-08-29"
+    verifiedAt: "2026-08-29",
+    selfHosted: true,
+    defaultPort: 80
   },
   {
     id: "github-open-webui",
     title: "Open WebUI",
     url: "https://openwebui.com",
     description: "Self-hosted AI interface for Ollama and OpenAI-compatible APIs.",
-    iconUrl: "",
+    iconUrl: catalogIconUrl("github-open-webui", "Open WebUI"),
     openingMode: "external_tab",
     category: "ai-platforms",
     catalogKind: "github_app",
@@ -170,29 +175,34 @@ export const appDirectory: AppDirectoryItem[] = [
     stars: 150265,
     language: "Python",
     license: "NOASSERTION",
-    verifiedAt: "2026-08-29"
+    verifiedAt: "2026-08-29",
+    selfHosted: true,
+    defaultPort: 8080
   },
   {
     id: "github-excalidraw",
     title: "Excalidraw",
     url: "https://excalidraw.com",
     description: "Hand-drawn style collaborative whiteboard and diagram tool.",
-    iconUrl: "",
+    iconUrl: catalogIconUrl("github-excalidraw", "Excalidraw"),
     openingMode: "external_tab",
     category: "design",
     catalogKind: "github_app",
     repositoryUrl: "https://github.com/excalidraw/excalidraw",
+    trialUrl: "https://excalidraw.com",
     stars: 130729,
     language: "TypeScript",
     license: "MIT",
-    verifiedAt: "2026-08-29"
+    verifiedAt: "2026-08-29",
+    selfHosted: true,
+    defaultPort: 3000
   },
   {
     id: "github-immich",
     title: "Immich",
     url: "https://immich.app",
     description: "High-performance self-hosted photo and video management.",
-    iconUrl: "",
+    iconUrl: catalogIconUrl("github-immich", "Immich"),
     openingMode: "external_tab",
     category: "media",
     catalogKind: "github_app",
@@ -200,14 +210,16 @@ export const appDirectory: AppDirectoryItem[] = [
     stars: 112892,
     language: "TypeScript",
     license: "AGPL-3.0",
-    verifiedAt: "2026-08-29"
+    verifiedAt: "2026-08-29",
+    selfHosted: true,
+    defaultPort: 2283
   },
   {
     id: "github-stirling-pdf",
     title: "Stirling PDF",
     url: "https://stirling.com",
     description: "Self-hosted browser toolkit for editing and converting PDFs.",
-    iconUrl: "",
+    iconUrl: catalogIconUrl("github-stirling-pdf", "Stirling PDF"),
     openingMode: "external_tab",
     category: "documents",
     catalogKind: "github_app",
@@ -215,14 +227,16 @@ export const appDirectory: AppDirectoryItem[] = [
     stars: 90870,
     language: "Java",
     license: "NOASSERTION",
-    verifiedAt: "2026-08-29"
+    verifiedAt: "2026-08-29",
+    selfHosted: true,
+    defaultPort: 8080
   },
   {
     id: "github-uptime-kuma",
     title: "Uptime Kuma",
     url: "https://uptime.kuma.pet",
     description: "Self-hosted service monitoring and status dashboard.",
-    iconUrl: "",
+    iconUrl: catalogIconUrl("github-uptime-kuma", "Uptime Kuma"),
     openingMode: "external_tab",
     category: "monitoring",
     catalogKind: "github_app",
@@ -230,14 +244,16 @@ export const appDirectory: AppDirectoryItem[] = [
     stars: 90722,
     language: "JavaScript",
     license: "MIT",
-    verifiedAt: "2026-08-29"
+    verifiedAt: "2026-08-29",
+    selfHosted: true,
+    defaultPort: 3001
   },
   {
     id: "github-anything-llm",
     title: "AnythingLLM",
     url: "https://anythingllm.com",
     description: "Local-first AI workspace with agents, documents, and models.",
-    iconUrl: "",
+    iconUrl: catalogIconUrl("github-anything-llm", "AnythingLLM"),
     openingMode: "external_tab",
     category: "ai-platforms",
     catalogKind: "github_app",
@@ -245,44 +261,52 @@ export const appDirectory: AppDirectoryItem[] = [
     stars: 65348,
     language: "JavaScript",
     license: "MIT",
-    verifiedAt: "2026-08-29"
+    verifiedAt: "2026-08-29",
+    selfHosted: true,
+    defaultPort: 3001
   },
   {
     id: "github-memos",
     title: "Memos",
     url: "https://usememos.com",
     description: "Lightweight self-hosted Markdown note-taking for quick capture.",
-    iconUrl: "",
+    iconUrl: catalogIconUrl("github-memos", "Memos"),
     openingMode: "external_tab",
     category: "notes",
     catalogKind: "github_app",
     repositoryUrl: "https://github.com/usememos/memos",
+    trialUrl: "https://demo.usememos.com",
     stars: 62626,
     language: "Go",
     license: "MIT",
-    verifiedAt: "2026-08-29"
+    verifiedAt: "2026-08-29",
+    selfHosted: true,
+    defaultPort: 5230
   },
   {
     id: "github-penpot",
     title: "Penpot",
     url: "https://penpot.app",
     description: "Open-source design and prototyping platform for product teams.",
-    iconUrl: "",
+    iconUrl: catalogIconUrl("github-penpot", "Penpot"),
     openingMode: "external_tab",
     category: "design",
     catalogKind: "github_app",
     repositoryUrl: "https://github.com/penpot/penpot",
+    trialUrl: "https://design.penpot.app",
     stars: 59333,
     language: "Clojure",
     license: "MPL-2.0",
-    verifiedAt: "2026-08-29"
+    verifiedAt: "2026-08-29",
+    selfHosted: true,
+    defaultPort: 9001
   },
   {
     id: "github-appsmith",
     title: "Appsmith",
     url: "https://www.appsmith.com",
     description: "Build internal tools, admin panels, and dashboards.",
-    iconUrl: "",
+    iconUrl: catalogIconUrl("github-appsmith", "Appsmith"),
     openingMode: "external_tab",
     category: "developer-tools",
     catalogKind: "github_app",
@@ -290,22 +314,91 @@ export const appDirectory: AppDirectoryItem[] = [
     stars: 40779,
     language: "TypeScript",
     license: "Apache-2.0",
-    verifiedAt: "2026-08-29"
+    verifiedAt: "2026-08-29",
+    selfHosted: true,
+    defaultPort: 80
   },
   {
     id: "github-actual-budget",
     title: "Actual Budget",
     url: "https://actualbudget.org",
     description: "Local-first personal finance and budgeting application.",
-    iconUrl: "",
+    iconUrl: catalogIconUrl("github-actual-budget", "Actual Budget"),
     openingMode: "external_tab",
     category: "finance",
     catalogKind: "github_app",
     repositoryUrl: "https://github.com/actualbudget/actual",
+    trialUrl: "https://app.actualbudget.org",
     stars: 28426,
     language: "TypeScript",
     license: "MIT",
-    verifiedAt: "2026-08-29"
+    verifiedAt: "2026-08-29",
+    selfHosted: true,
+    defaultPort: 5006
+  },
+  {
+    id: "github-flowise",
+    title: "Flowise",
+    url: "https://flowiseai.com",
+    description: "Visual builder for AI agents, tools, and retrieval workflows.",
+    iconUrl: catalogIconUrl("github-flowise", "Flowise"),
+    openingMode: "external_tab",
+    category: "ai-platforms",
+    catalogKind: "github_app",
+    repositoryUrl: "https://github.com/FlowiseAI/Flowise",
+    language: "TypeScript",
+    license: "Apache-2.0",
+    verifiedAt: "2026-08-31",
+    selfHosted: true,
+    defaultPort: 3000
+  },
+  {
+    id: "github-librechat",
+    title: "LibreChat",
+    url: "https://www.librechat.ai",
+    description: "Multi-provider, self-hosted AI chat workspace with agents and tools.",
+    iconUrl: catalogIconUrl("github-librechat", "LibreChat"),
+    openingMode: "external_tab",
+    category: "ai-platforms",
+    catalogKind: "github_app",
+    repositoryUrl: "https://github.com/danny-avila/LibreChat",
+    language: "TypeScript",
+    license: "MIT",
+    verifiedAt: "2026-08-31",
+    selfHosted: true,
+    defaultPort: 3080
+  },
+  {
+    id: "github-comfyui",
+    title: "ComfyUI",
+    url: "https://www.comfy.org",
+    description: "Node-based local interface for generative image, video, audio, and 3D workflows.",
+    iconUrl: catalogIconUrl("github-comfyui", "ComfyUI"),
+    openingMode: "external_tab",
+    category: "media",
+    catalogKind: "github_app",
+    repositoryUrl: "https://github.com/Comfy-Org/ComfyUI",
+    language: "Python",
+    license: "GPL-3.0",
+    verifiedAt: "2026-08-31",
+    selfHosted: true,
+    defaultPort: 8188
+  },
+  {
+    id: "github-chainlit",
+    title: "Chainlit",
+    url: "https://chainlit.io",
+    description: "Python framework and WebUI for conversational AI applications.",
+    iconUrl: catalogIconUrl("github-chainlit", "Chainlit"),
+    openingMode: "external_tab",
+    category: "developer-tools",
+    catalogKind: "github_app",
+    repositoryUrl: "https://github.com/Chainlit/chainlit",
+    language: "Python",
+    license: "Apache-2.0",
+    verifiedAt: "2026-08-31",
+    selfHosted: true,
+    defaultPort: 8000
   }
 ];
 

@@ -21,3 +21,11 @@ public/catalog.json
 # Python (skill scanner cache)
 __pycache__/
 *.pyc
+
+.next-e2e/
+playwright-report/
+test-results/
+
+# Local acceptance logs and screenshots must not trigger Tailwind's source watcher.
+artifacts/*
+!artifacts/README.md

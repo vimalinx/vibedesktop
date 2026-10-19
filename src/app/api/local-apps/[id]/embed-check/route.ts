@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { AuthRequiredError, requireCurrentUser } from "@/lib/auth";
-import { DaemonApiError, DaemonUnreachableError, getLocalApp } from "@/lib/daemon-client";
+import { DaemonApiError, DaemonTimeoutError, DaemonUnreachableError, getLocalApp } from "@/lib/daemon-client";
 import { checkLocalAppEmbeddability } from "@/lib/metadata-resolver";
 import { UnsafeUrlError } from "@/lib/url-safety";
 
@@ -27,6 +27,7 @@ export async function GET(request: Request, context: RouteContext) {
   } catch (error) {
     if (error instanceof AuthRequiredError) return apiError(401, "auth_required", error.message);
     if (error instanceof UnsafeUrlError) return apiError(400, "not_loopback", error.message);
+    if (error instanceof DaemonTimeoutError) return apiError(504, "daemon_timeout", error.message);
     if (error instanceof DaemonUnreachableError) return apiError(503, "daemon_unreachable", error.message);
     if (error instanceof DaemonApiError) {
       const status = error.code === "not_found" ? 404 : error.code === "invalid_request" ? 400 : 502;
