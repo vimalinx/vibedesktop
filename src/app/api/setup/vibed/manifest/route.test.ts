@@ -16,7 +16,7 @@ describe("GET /api/setup/vibed/manifest", () => {
 
     expect(typeof manifest.version).toBe("string");
     expect(manifest.version).toContain("+");
-    expect(manifest.releaseVersion).toBe("0.2.1");
+    expect(manifest.releaseVersion).toBe("0.2.2");
     expect(Array.isArray(manifest.runtime)).toBe(true);
     expect(manifest.runtime.length).toBeGreaterThan(0);
     expect(manifest.signature).toBeNull();

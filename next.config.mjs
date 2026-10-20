@@ -1,3 +1,8 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const addAppSkillFiles = [
   "./.claude/skills/add_app/SKILL.md",
@@ -22,6 +27,9 @@ const nextConfig = {
   // regular `next start` layout. The tracing declarations below list the
   // non-imported files each route reads at runtime.
   ...(process.env.VIBE_STANDALONE === "1" ? { output: "standalone" } : {}),
+  // Pin the tracing root to this project. Otherwise Next adopts any package-lock.json found in a
+  // parent directory (a stray ~/package-lock.json is common) and nests the standalone server.
+  outputFileTracingRoot: projectRoot,
   outputFileTracingIncludes: {
     "/api/setup/add-app-skill": addAppSkillFiles,
     "/api/setup/vibed": vibedRuntimeFiles,

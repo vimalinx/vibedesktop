@@ -1,6 +1,6 @@
 {
   "name": "vibedesktop",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "A local-only, single-user web desktop, fully open source under Apache-2.0.",
   "license": "Apache-2.0",
   "author": "Vimalinx",

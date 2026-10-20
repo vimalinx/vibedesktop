@@ -129,7 +129,7 @@ vibed status | logs | update | rollback
 <summary>安装选项</summary>
 
 安装器会从 3000 到 3010 选第一个空闲端口。用 `curl … | sh -s -- --port 3002` 指定端口，
-`--tag v0.2.1` 指定版本，`--repo <url>` 从自己的 fork 安装。
+`--tag v0.2.2` 指定版本，`--repo <url>` 从自己的 fork 安装。
 
 在反向代理或 SSH 端口转发后面使用？把 `VIBE_PUBLIC_ORIGIN` 设成浏览器地址栏里的精确地址（真实域名需要 HTTPS）。
 

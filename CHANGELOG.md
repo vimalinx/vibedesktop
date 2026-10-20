@@ -3,6 +3,13 @@
 All notable user-visible changes are documented here. Vibe Desktop follows
 semantic versioning from the first public 0.2 release onward.
 
+## 0.2.2 - 2026-10-20
+
+- Installation no longer fails when a `package-lock.json` exists in a parent
+  directory such as the home directory: the build pins its own project root
+  instead of adopting the outer lockfile. The release gate now installs with a
+  stray lockfile in the home directory to keep it that way.
+
 ## 0.2.1 - 2026-10-20
 
 - The whole-app installer runs on Node.js 20 again (it used a Node 22-only API).

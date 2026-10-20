@@ -10,7 +10,7 @@
  */
 import { createHash, createPublicKey, verify } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
-import { mkdtemp, readFile, readlink, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readlink, rm, stat, writeFile } from "node:fs/promises";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -69,6 +69,9 @@ try {
   await validateReleaseAssets(publicRoot, packageJson.version);
 
   await run("tag disposable public source", "git", ["tag", "-f", tag], publicRoot);
+  // Real home directories often hold a stray package-lock.json; the install must not adopt it as the build root.
+  await mkdir(isolatedHome, { recursive: true, mode: 0o700 });
+  await writeFile(path.join(isolatedHome, "package-lock.json"), "{}\n");
   await run(
     "one-click install whole app, signed vibed, and Agent Skills",
     "sh",
