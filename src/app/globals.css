@@ -7103,3 +7103,198 @@ a:focus-visible,
   color: var(--surface-raised);
   background: var(--text-primary);
 }
+
+/* ----- Market install confirmation ----- */
+.market-install-dialog {
+  width: min(640px, 100%);
+}
+
+.market-install-head {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.market-install-head img,
+.market-install-initial {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  object-fit: contain;
+  background: var(--surface-sunken);
+}
+
+.market-install-initial {
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  font-size: 1.4rem;
+  color: var(--text-secondary);
+}
+
+.market-install-head h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.market-install-head a {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.market-install-head p {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+}
+
+.market-install-trust {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: var(--surface-sunken);
+}
+
+.market-install-trust strong {
+  color: var(--text-primary);
+  margin-right: 4px;
+}
+
+.market-install-trust.trust-reviewed {
+  border-left-color: var(--state-running);
+}
+
+.market-install-trust.trust-community {
+  border-left-color: var(--state-starting);
+}
+
+.market-install-trust.trust-unlisted {
+  border-left-color: var(--state-failed);
+}
+
+.market-install-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 10px 16px;
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.market-install-facts dt {
+  color: var(--text-secondary);
+}
+
+.market-install-facts dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.market-install-facts code {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.market-install-requires {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.market-install-requires .is-available {
+  color: var(--text-primary);
+}
+
+.market-install-requires .is-missing {
+  color: var(--state-failed);
+}
+
+.market-install-commands {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.market-install-commands li {
+  display: grid;
+  gap: 3px;
+}
+
+.market-install-commands code {
+  display: block;
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  white-space: pre-wrap;
+  background: var(--surface-sunken);
+}
+
+.market-install-service small {
+  color: var(--text-faint);
+}
+
+.market-install-progress,
+.market-install-error,
+.market-install-success {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 0;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.market-install-error {
+  display: block;
+  color: var(--state-failed);
+}
+
+.market-install-success {
+  border-left: 4px solid var(--state-running);
+  padding-left: 10px;
+  color: var(--text-primary);
+}
+
+.market-install-spinner {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: marketSpin var(--motion-ambient) linear infinite;
+}
+
+@keyframes marketSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-install-spinner {
+    animation: none;
+  }
+}
+
+.market-install-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.market-install-note {
+  margin-right: auto;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}

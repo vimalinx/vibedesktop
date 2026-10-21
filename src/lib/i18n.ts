@@ -421,6 +421,33 @@ export interface I18nMessages {
     wallpaperMissingRestored: string;
     untitledApp: string;
   };
+  market: {
+    title: string;
+    loading: (repository: string) => string;
+    retry: string;
+    trust: Record<"reviewed" | "community" | "unlisted", string>;
+    trustNote: Record<"reviewed" | "community" | "unlisted", string>;
+    commit: string;
+    requires: string;
+    missing: string;
+    setup: string;
+    noSetup: string;
+    services: string;
+    primary: string;
+    data: string;
+    install: string;
+    update: string;
+    installed: string;
+    installing: string;
+    open: string;
+    done: (name: string) => string;
+    missingBlocked: string;
+    failed: string;
+    fromGithub: string;
+    fromGithubHint: string;
+    preview: string;
+    browse: string;
+  };
   data: {
     wallpapers: Record<string, string>;
     themes: Record<string, { name: string; browserFit: string; description: string }>;
@@ -881,6 +908,37 @@ const en: I18nMessages = {
     wallpaperSaveFailed: "Could not save this wallpaper.",
     wallpaperMissingRestored: "The local wallpaper is no longer available. The default wallpaper was restored.",
     untitledApp: "Untitled App"
+  },
+  market: {
+    title: "Install app",
+    loading: (repository) => `Reading ${repository} from GitHub…`,
+    retry: "Try again",
+    trust: { reviewed: "Reviewed", community: "Community", unlisted: "Not in the market" },
+    trustNote: {
+      reviewed: "The Vibe Desktop maintainer reviewed this exact commit.",
+      community: "Listed automatically from its own repository. Nobody has reviewed this code; install it only if you trust the author.",
+      unlisted: "This repository is not listed in the Vibe Desktop market. Install it only if you trust where the link came from."
+    },
+    commit: "Commit",
+    requires: "Needs",
+    missing: "not installed",
+    setup: "Runs once to install",
+    noSetup: "Nothing to install first.",
+    services: "Starts",
+    primary: "opens",
+    data: "Keeps its data in",
+    install: "Install and start",
+    update: "Update to this commit",
+    installed: "Already installed at this commit.",
+    installing: "Installing…",
+    open: "Open",
+    done: (name) => `${name} is installed and running.`,
+    missingBlocked: "Install the missing commands first, then try again.",
+    failed: "Installation failed. Nothing was left running.",
+    fromGithub: "Install from GitHub",
+    fromGithubHint: "A repository that ships .vibedesktop/app.json, for example owner/repo.",
+    preview: "Preview",
+    browse: "Browse the market"
   },
   data: {
     wallpapers: {
@@ -1444,6 +1502,37 @@ const zh: I18nMessages = {
     wallpaperSaveFailed: "无法保存这张壁纸。",
     wallpaperMissingRestored: "本地壁纸已不存在，已恢复默认壁纸。",
     untitledApp: "未命名应用"
+  },
+  market: {
+    title: "安装应用",
+    loading: (repository) => `正在从 GitHub 读取 ${repository}…`,
+    retry: "重试",
+    trust: { reviewed: "已审核", community: "社区", unlisted: "未上架" },
+    trustNote: {
+      reviewed: "Vibe Desktop 维护者审核过这个确切的提交。",
+      community: "由作者仓库自动收录，没有人审核过这份代码。请只安装你信任的作者的应用。",
+      unlisted: "这个仓库不在 Vibe Desktop 应用市场里。请确认链接来源可信再安装。"
+    },
+    commit: "提交",
+    requires: "需要",
+    missing: "未安装",
+    setup: "安装时运行一次",
+    noSetup: "无需额外安装步骤。",
+    services: "启动",
+    primary: "打开这个",
+    data: "数据保存在",
+    install: "安装并启动",
+    update: "更新到这个提交",
+    installed: "已经安装了这个提交。",
+    installing: "正在安装…",
+    open: "打开",
+    done: (name) => `${name} 已安装并在运行。`,
+    missingBlocked: "请先安装缺少的命令，再重试。",
+    failed: "安装失败，没有留下任何在运行的进程。",
+    fromGithub: "从 GitHub 安装",
+    fromGithubHint: "带有 .vibedesktop/app.json 的仓库，例如 owner/repo。",
+    preview: "预览",
+    browse: "逛逛应用市场"
   },
   data: {
     wallpapers: {

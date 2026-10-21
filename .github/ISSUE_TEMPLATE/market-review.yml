@@ -1,0 +1,37 @@
+name: Market review request
+description: Ask for the Reviewed badge for one exact commit of an app in the Vibe Desktop market.
+title: "Review: owner/repo"
+labels: ["market-review"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Run the check on https://vibedesktop.online/developers first. A review covers exactly one commit;
+        the market installs that commit until the next review.
+  - type: input
+    id: repository
+    attributes:
+      label: Repository
+      placeholder: owner/repo
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit SHA (40 characters)
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: What reviewers should know
+      description: Required accounts or API keys, large downloads, GPU needs, anything unusual the setup does.
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: "`check.py --run` passes on a clean checkout of this commit."
+          required: true
+        - label: The app binds to 127.0.0.1, keeps data in $VIBE_DATA_DIR, and its setup uses no sudo or global installs.
+          required: true

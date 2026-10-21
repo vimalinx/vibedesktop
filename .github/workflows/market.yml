@@ -1,0 +1,55 @@
+name: Market and site
+
+# Rebuilds the app market from GitHub and publishes vibedesktop.online.
+# Deployment needs the repository secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
+# (and optionally the variable CLOUDFLARE_PAGES_PROJECT); without them the built site is
+# still uploaded as an artifact.
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "market/**"
+      - "skills/vibedesktop-app/**"
+      - "src/lib/app-manifest.mjs"
+      - "scripts/build-site.mjs"
+      - "scripts/market-build.mjs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: market-site
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HAS_CLOUDFLARE: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build site
+        run: node scripts/build-site.mjs --out dist/site
+      - name: Build market
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/market-build.mjs --out dist/site
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: dist/site
+          retention-days: 7
+      - name: Deploy to Cloudflare Pages
+        if: env.HAS_CLOUDFLARE == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 pages deploy dist/site --project-name "${{ vars.CLOUDFLARE_PAGES_PROJECT || 'vibedesktop' }}" --branch main --commit-dirty=true

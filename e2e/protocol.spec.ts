@@ -37,7 +37,7 @@ test("live v1 preserves legacy state and rejects invalid requests without changi
   const before = await (await request.get("/api/v1/desktop")).json();
   expect(before.desktop.id).toBe(baseline.desktop.id);
   const denied = await request.put("/api/v1/desktop/packages/org.example.shell/preferences", { headers: { Origin: "https://evil.example" }, data: { ifRevision: null, schemaVersion: 1, values: {} } });
-  expect(denied.status()).toBe(403); expect(denied.headers()["x-vibe-protocol"]).toBe("1.1");
+  expect(denied.status()).toBe(403); expect(denied.headers()["x-vibe-protocol"]).toBe("1.2");
   const invalid = await request.patch("/api/v1/desktop", { headers, data: { shellStyle: 123 } });
   expect(invalid.status()).toBe(400); expect((await invalid.json()).error.outcome).toBe("not_started");
   expect((await request.delete("/api/v1/local-apps/discovery", { headers })).status()).toBe(405);

@@ -1,8 +1,8 @@
 import { capabilityIds, operations } from "./operations";
 export const protocolName = "vibedesktop";
-export const protocolVersion = { major: 1, minor: 1 } as const;
+export const protocolVersion = { major: 1, minor: 2 } as const;
 export const protocolHeader = "x-vibe-protocol";
-export const protocolVersionString = "1.1";
+export const protocolVersionString = "1.2";
 export const protocolManifest = {
   protocol: protocolName,
   version: protocolVersion,

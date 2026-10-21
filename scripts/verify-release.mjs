@@ -147,8 +147,32 @@ async function assertRequiredPublicFiles(root) {
     "src/app/api/setup/app/route.ts",
     "src/app/api/catalog-installs/[id]/agent-complete/route.ts",
     "src/lib/app-installer.ts",
+    "src/lib/app-manifest.mjs",
+    "src/lib/market-installer.ts",
+    "scripts/vibedesktop-install.mjs",
+    "scripts/market-build.mjs",
+    "scripts/build-site.mjs",
+    ".github/workflows/market.yml",
+    ".github/ISSUE_TEMPLATE/market-review.yml",
+    "docs/app-format.md",
+    "market/reviewed.json",
+    "market/blocked.json",
+    "site/schema/app-v1.json",
+    "site/skill.sh",
+    "skills/vibedesktop-app/SKILL.md",
+    "skills/vibedesktop-app/scripts/check.py",
+    "examples/fullstack-app/.vibedesktop/app.json",
   ];
   for (const relative of required) await stat(path.join(root, relative));
+  // The author skill ships standalone copies; they must not drift from the canonical files.
+  for (const [canonical, copy] of [
+    [".claude/skills/add_app/appspec.py", "skills/vibedesktop-app/scripts/appspec.py"],
+    ["docs/app-format.md", "skills/vibedesktop-app/references/format.md"],
+  ]) {
+    if (await readFile(path.join(root, canonical), "utf8") !== await readFile(path.join(root, copy), "utf8")) {
+      throw new Error(`${copy} differs from ${canonical}; copy the canonical file over it.`);
+    }
+  }
 }
 
 async function assertLicenseContract(root, packageJson) {
@@ -259,6 +283,13 @@ async function verifyAppInstall(sourceRoot, tag) {
   if (!Number.isInteger(version.port) || version.port < 1 || version.port > 65535) throw new Error("Installed app port provenance is incorrect.");
   await stat(path.join(current, "scripts", "launch-desktop-chromium.mjs"));
   await stat(path.join(current, "browser-extension", "vibe-embed-companion", "manifest.json"));
+  // `vibedesktop install` must resolve its shared parser inside the slim release; a bad argument exits 2 before any network use.
+  const installCli = await execFileAsync(process.execPath, [path.join(current, "scripts", "vibedesktop-install.mjs"), "not a repository"], { cwd: current }).then(() => 0, (error) => error.code);
+  if (installCli !== 2) throw new Error(`Installed vibedesktop install CLI did not load (exit ${installCli}).`);
+  const urlHandler = await readFile(path.join(env.XDG_DATA_HOME, "applications", "vibedesktop-url-handler.desktop"), "utf8");
+  if (!urlHandler.includes("MimeType=x-scheme-handler/vibedesktop;") || !urlHandler.includes("handle-url %u")) {
+    throw new Error("Installed vibedesktop:// handler entry is incomplete.");
+  }
   // The installed release must be the slim standalone server, not a full checkout.
   await stat(path.join(current, "server.js"));
   if (await stat(path.join(current, ".git")).then(() => true, () => false)) throw new Error("Installed app release still contains git metadata.");
@@ -266,6 +297,7 @@ async function verifyAppInstall(sourceRoot, tag) {
   if (!currentTarget.startsWith("releases/")) throw new Error("app current symlink is not release-versioned.");
   const cli = path.join(env.XDG_BIN_HOME, "vibedesktop");
   await run("validate installed app CLI", "sh", ["-n", cli], sourceRoot, env);
+  if (!(await readFile(cli, "utf8")).includes("install|handle-url)")) throw new Error("Installed app CLI lacks the install command.");
   const unitPath = path.join(env.XDG_CONFIG_HOME, "systemd", "user", "vibedesktop-app.service");
   const unit = await readFile(unitPath, "utf8");
   for (const expected of [
@@ -324,7 +356,8 @@ async function run(label, command, args, cwd, extraEnv = {}) {
       cwd,
       env: { ...process.env, ...extraEnv },
       maxBuffer: 128 * 1024 * 1024,
-      timeout: 15 * 60 * 1000,
+      // Recipe qualification clones large upstream repositories; slow links can raise the limit.
+      timeout: (Number(process.env.VIBE_VERIFY_STEP_TIMEOUT_MINUTES) || 15) * 60 * 1000,
     });
     const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
     if (output) process.stdout.write(`${output.slice(-8000)}\n`);

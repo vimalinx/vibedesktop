@@ -166,6 +166,59 @@ export interface CatalogWorkspaceInstallStatus {
   healthy?: boolean;
 }
 
+/** How far the vibedesktop.online market vouches for an app at the previewed commit. */
+export type MarketTrust = "reviewed" | "community" | "unlisted";
+
+export interface MarketAppService {
+  name: string;
+  cwd: string;
+  run: string;
+  port: number;
+  health: string;
+}
+
+/** Everything the confirmation dialog shows before any code from the repository runs. */
+export interface MarketInstallPreview {
+  id: string;
+  repository: string;
+  repositoryUrl: string;
+  ref: string;
+  digest: string;
+  name: string;
+  description: string;
+  iconUrl: string | null;
+  category: string;
+  homepage: string | null;
+  trust: MarketTrust;
+  requires: { command: string; available: boolean }[];
+  setup: string[];
+  services: MarketAppService[];
+  env: Record<string, string>;
+  workspacePath: string;
+  dataPath: string;
+  installed: MarketInstallStatus | null;
+}
+
+export type MarketInstallState = "queued" | "fetching" | "setup" | "starting" | "installed" | "failed" | "not_installed";
+
+export interface MarketInstallStatus {
+  id: string;
+  repository: string;
+  name: string;
+  state: MarketInstallState;
+  message: string;
+  ref: string;
+  trust: MarketTrust;
+  updatedAt: string;
+  iconUrl?: string | null;
+  appId?: string;
+  url?: string;
+  workspacePath?: string;
+  dataPath?: string;
+  running?: boolean;
+  healthy?: boolean;
+}
+
 export interface CatalogAgentInstallInstruction {
   itemId: string;
   title: string;
@@ -284,6 +337,8 @@ export interface LocalAppImportPlan {
   bundleDir: string;
   services: LocalAppBundleService[];
   notes: string[];
+  /** Present when the project ships `.vibedesktop/app.json` (protocol 1.2). */
+  declared?: { requires: string[]; setup: string[]; dataDir: string };
 }
 
 export interface LocalAppImportResult {

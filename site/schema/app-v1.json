@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vibedesktop.online/schema/app-v1.json",
+  "title": "Vibe Desktop app manifest (.vibedesktop/app.json)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "name",
+    "services"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60,
+      "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 200,
+      "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+    },
+    "icon": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\.([Ss][Vv][Gg]|[Pp][Nn][Gg]|[Ww][Ee][Bb][Pp]|[Jj][Pp][Ee]?[Gg])$"
+    },
+    "category": {
+      "enum": [
+        "ai",
+        "developer-tools",
+        "productivity",
+        "media",
+        "education",
+        "data",
+        "games",
+        "other"
+      ]
+    },
+    "homepage": {
+      "type": "string",
+      "pattern": "^https://",
+      "maxLength": 300
+    },
+    "requires": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._+-]{0,39}$"
+      }
+    },
+    "setup": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1000
+      }
+    },
+    "services": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "description": "The first service is the page the desktop opens.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "run",
+          "port"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+          },
+          "cwd": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Relative folder inside the repository; no .."
+          },
+          "run": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1024,
+            "maximum": 65535
+          },
+          "health": {
+            "type": "string",
+            "pattern": "^/(?!/)\\S{0,199}$"
+          }
+        }
+      }
+    },
+    "env": {
+      "type": "object",
+      "maxProperties": 32,
+      "propertyNames": {
+        "pattern": "^(?!(PORT|HOST|PATH|HOME|USER|SHELL|PWD)$)(?!LD_)(?!VIBE_)[A-Z_][A-Z0-9_]{0,63}$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 1000
+      }
+    }
+  }
+}

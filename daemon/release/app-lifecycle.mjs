@@ -143,6 +143,8 @@ export async function uninstallApp(options) {
   if (await removeIfExists(options.cliPath)) removed.push(options.cliPath);
   if (await removeIfExists(options.runCliPath)) removed.push(options.runCliPath);
   if (options.desktopPath && await removeIfExists(options.desktopPath)) removed.push(options.desktopPath);
+  const urlHandlerPath = options.desktopPath ? path.join(path.dirname(options.desktopPath), "vibedesktop-url-handler.desktop") : null;
+  if (urlHandlerPath && await removeIfExists(urlHandlerPath)) removed.push(urlHandlerPath);
 
   await removeRuntimeTree(options.appRoot);
   removed.push(options.appRoot);

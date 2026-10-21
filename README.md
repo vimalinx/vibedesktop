@@ -63,6 +63,43 @@ vibedesktop scan                            # list launchable WebUIs already on 
 AI agents (Claude Code, Codex, and others) get the same ability through the bundled
 `add-app` skill: *"Use add-app to add ~/Projects/my-webui to Vibe Desktop and verify it."*
 
+## App market
+
+[vibedesktop.online/apps](https://vibedesktop.online/apps) lists open-source projects that
+ship a `.vibedesktop/app.json`. **Install** wakes Vibe Desktop on your machine (starting it if
+needed) and opens a confirmation dialog showing the exact commit, every setup command, every
+service and port, and where data is kept. Nothing runs until you confirm. Then it installs,
+starts, health-checks, and adds one icon — or rolls everything back.
+
+```bash
+vibedesktop install owner/repo          # same dialog from the terminal
+```
+
+Or paste a repository into **Local WebApps → Import project → Install from GitHub**. Updates keep
+your data, and a failed update restarts the previous version.
+
+## Make your project installable
+
+Commit one file and add one GitHub topic:
+
+```json
+{
+  "schemaVersion": 1,
+  "name": "Notes AI",
+  "setup": ["npm ci --prefix web", "uv sync --directory server --frozen"],
+  "services": [
+    { "name": "web", "cwd": "web", "run": "npm run dev -- --port $PORT", "port": 5173 },
+    { "name": "api", "cwd": "server", "run": "uv run uvicorn app:app --port 8000", "port": 8000 }
+  ]
+}
+```
+
+Save it as `.vibedesktop/app.json`, prove it runs with `check.py --run`, push, and add the topic
+`vibedesktop-app`. The market picks it up within six hours — no account, no form. Agents can do
+all of it with the `vibedesktop-app` skill (`curl -fsSL https://vibedesktop.online/skill.sh | sh`).
+Full reference: [docs/app-format.md](docs/app-format.md) · checker:
+[vibedesktop.online/developers](https://vibedesktop.online/developers).
+
 ## Supported stacks
 
 | | Detected automatically |
@@ -96,6 +133,7 @@ never moved silently, because your proxy config depends on them.
 | | |
 | --- | --- |
 | **Local only** | Listens on 127.0.0.1. Requests for any other host name are refused, which blocks DNS-rebinding attacks. Cross-site writes are rejected. No accounts, no telemetry, no cloud. |
+| **Confirmed installs** | A market link can only open a dialog. You see the pinned commit, every command, and every port before anything runs. See the [security model](SECURITY.md#security-model). |
 | **Safe updates** | Every install or update is staged, health-checked, and switched atomically. A failed version rolls back to the previous one automatically. `vibedesktop rollback` works offline. |
 | **Crash containment** | A failing window shows a recoverable card instead of blanking the desktop. `/?safe=1` starts without reopening the last windows. |
 | **Durable state** | Configuration is written with fsync and a last-good copy. A file damaged by power loss is set aside and the previous copy is restored, so startup never fails on it. |
@@ -113,7 +151,8 @@ disk space.
 ```bash
 vibedesktop open | status | logs
 vibedesktop start | stop | restart
-vibedesktop add <dir> [--plan | --start] [--name NAME]
+vibedesktop add <dir> [--plan | --start] [--setup] [--name NAME]
+vibedesktop install <owner/repo>[@<commit>]   # review and install from GitHub
 vibedesktop scan
 vibedesktop update      # fetch the latest release, build, switch, health-check, roll back on failure
 vibedesktop rollback    # return to the previous version, no network needed

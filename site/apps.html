@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Open-source frontend + backend apps you can install into Vibe Desktop with one click. Every install shows the exact commit and commands first.">
+    <meta name="theme-color" content="#0c0e0f">
+    <title>App market — Vibe Desktop</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body data-page="apps">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Vibe Desktop home">
+        <img src="/icon.svg" width="36" height="36" alt="">
+        <span>Vibe Desktop</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="/apps" aria-current="page">Apps</a>
+        <a href="/developers">Developers</a>
+        <a href="/#install">Install</a>
+        <a href="https://github.com/vimalinx/vibedesktop">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="main" class="page">
+      <section class="page-head" aria-labelledby="apps-title">
+        <p class="eyebrow">APP MARKET</p>
+        <h1 id="apps-title">Apps for Vibe Desktop</h1>
+        <p class="lede">Open-source projects that ship <code>.vibedesktop/app.json</code>. <strong>Install</strong> opens Vibe Desktop on your computer and shows the exact commit, every command, and every port before anything runs.</p>
+        <p class="lede-zh" lang="zh-CN">点「安装」会唤起你电脑上的 Vibe Desktop，先展示要运行的提交、命令和端口，你确认后才会安装。</p>
+      </section>
+
+      <div class="market-notice" role="note">
+        <strong>Community</strong> apps are listed automatically and nobody has reviewed their code.
+        <strong>Reviewed</strong> apps were checked by the maintainer at one exact commit.
+        Nothing happens? <a href="/#install">Install Vibe Desktop</a> first, then click Install again.
+      </div>
+
+      <div class="market-toolbar">
+        <label class="market-search">
+          <span class="visually-hidden">Search apps</span>
+          <input type="search" placeholder="Search apps" data-market-search autocomplete="off">
+        </label>
+        <div class="market-categories" role="group" aria-label="Category" data-market-categories></div>
+      </div>
+
+      <p class="market-status" role="status" aria-live="polite" data-market-status>Loading apps…</p>
+      <div class="market-grid" data-market-grid></div>
+
+      <section class="market-empty" data-market-empty hidden aria-labelledby="empty-title">
+        <h2 id="empty-title">Be the first app here.</h2>
+        <p>Add <code>.vibedesktop/app.json</code> to your repository and the GitHub topic <code>vibedesktop-app</code>. The market picks it up within six hours.</p>
+        <a class="button primary" href="/developers">List your app</a>
+      </section>
+    </main>
+
+    <footer>
+      <div class="brand footer-brand">
+        <img src="/icon.svg" width="32" height="32" alt="">
+        <span>Vibe Desktop</span>
+      </div>
+      <p>Listings come from public GitHub repositories. Report a problem app in <a href="https://github.com/vimalinx/vibedesktop/issues">Issues</a>.</p>
+      <div>
+        <a href="https://github.com/vimalinx/vibedesktop">Source</a>
+        <a href="/developers">Developers</a>
+        <a href="/market.json">market.json</a>
+      </div>
+    </footer>
+  </body>
+</html>

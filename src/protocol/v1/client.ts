@@ -1,6 +1,6 @@
 import type { DesktopDataSource, LocalProbeStatus } from "./data-source";
 import { DesktopDataError } from "./data-source";
-import type { AppDirectoryItem, CatalogAgentInstallInstruction, CatalogWorkspaceInstallStatus, DesktopPayload, EmbedCheckResult, LocalAppBundle, LocalAppDiscoveryCandidate, LocalAppImportPlan, LocalAppImportResult, LocalAppView, VibeUser } from "./types";
+import type { AppDirectoryItem, CatalogAgentInstallInstruction, CatalogWorkspaceInstallStatus, DesktopPayload, EmbedCheckResult, LocalAppBundle, LocalAppDiscoveryCandidate, LocalAppImportPlan, LocalAppImportResult, LocalAppView, MarketInstallPreview, MarketInstallStatus, VibeUser } from "./types";
 import { createProtocolTransport, type DesktopClientOptions } from "./transport";
 import type { ProtocolManifest } from "./manifest";
 
@@ -31,6 +31,13 @@ export function createDesktopClient(options: DesktopClientOptions = {}): Desktop
       async uninstall(id, purgeData = false) { return (await request<{ install: CatalogWorkspaceInstallStatus }>("catalog.uninstall", { id, json: { purgeData } })).install; },
       async agentInstruction(id) { return (await request<{ instruction: CatalogAgentInstallInstruction }>("catalog.agentInstruction", { id })).instruction; },
     },
+    marketInstalls: {
+      // Preview fetches one commit from GitHub; allow for a slow network.
+      async preview(repository, ref) { return (await request<{ preview: MarketInstallPreview }>("market.preview", { json: { repository, ...(ref ? { ref } : {}) }, timeoutMs: 200_000 })).preview; },
+      async list() { return (await request<{ installs: MarketInstallStatus[] }>("market.installs")).installs; },
+      async install(input) { return (await request<{ install: MarketInstallStatus }>("market.install", { json: input })).install; },
+      async uninstall(id, purgeData = false) { return (await request<{ install: MarketInstallStatus }>("market.uninstall", { id, json: { purgeData } })).install; },
+    },
     urlMetadata: {
       resolve: url => request("url.resolve", { json: { url } }),
       async checkEmbeddable(url) {
@@ -56,7 +63,8 @@ export function createDesktopClient(options: DesktopClientOptions = {}): Desktop
       },
       async planImport(input) { return (await request<{ plan: LocalAppImportPlan }>("localApps.importPlan", { json: input, timeoutMs: 45_000 })).plan; },
       // A verified start waits for the project to boot and pass its health probe.
-      async importProject(input) { return (await request<{ result: LocalAppImportResult }>("localApps.import", { json: input, timeoutMs: 120_000 })).result; },
+      // Declared setup steps install dependencies and may take many minutes.
+      async importProject(input) { return (await request<{ result: LocalAppImportResult }>("localApps.import", { json: input, timeoutMs: input.setup ? 41 * 60_000 : 120_000 })).result; },
       async bundle(id) { return (await request<{ bundle: LocalAppBundle | null }>("localApps.bundle", { id })).bundle; },
       async resolveIcon(id) {
         try { return await request<Blob>("localApps.icon", { id }); }

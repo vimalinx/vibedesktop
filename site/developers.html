@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Make your open-source frontend + backend project installable from the Vibe Desktop app market with one file and one GitHub topic.">
+    <meta name="theme-color" content="#0c0e0f">
+    <title>List your app — Vibe Desktop</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body data-page="developers">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Vibe Desktop home">
+        <img src="/icon.svg" width="36" height="36" alt="">
+        <span>Vibe Desktop</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="/apps">Apps</a>
+        <a href="/developers" aria-current="page">Developers</a>
+        <a href="/#install">Install</a>
+        <a href="https://github.com/vimalinx/vibedesktop">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="main" class="page">
+      <section class="page-head" aria-labelledby="dev-title">
+        <p class="eyebrow">FOR OPEN-SOURCE AUTHORS</p>
+        <h1 id="dev-title">One file. One topic. Installable everywhere.</h1>
+        <p class="lede">Commit <code>.vibedesktop/app.json</code> to say how your project installs and which services it starts. Every Vibe Desktop can then install it with one click, run the frontend and backend as one app, and keep it healthy.</p>
+        <p class="lede-zh" lang="zh-CN">在仓库里放一个 <code>.vibedesktop/app.json</code>，再加一个 GitHub topic，你的前后端项目就能被所有 Vibe Desktop 一键安装。不需要账号，不需要表单。</p>
+      </section>
+
+      <ol class="steps">
+        <li>
+          <span class="feature-number">01</span>
+          <h2>Describe your app</h2>
+          <p>List the install commands and the services with their ports. The first service is the page that opens.</p>
+          <pre class="code-sample"><code>{
+  "$schema": "https://vibedesktop.online/schema/app-v1.json",
+  "schemaVersion": 1,
+  "name": "Notes AI",
+  "description": "Take notes and ask questions about them.",
+  "icon": "icon.svg",
+  "requires": ["node", "npm", "uv"],
+  "setup": ["npm ci --prefix web", "uv sync --directory server --frozen"],
+  "services": [
+    { "name": "web", "cwd": "web", "run": "npm run dev -- --port $PORT", "port": 5173 },
+    { "name": "api", "cwd": "server", "run": "uv run uvicorn app:app --port 8000", "port": 8000, "health": "/health" }
+  ]
+}</code></pre>
+          <p class="step-links"><a href="https://github.com/vimalinx/vibedesktop/blob/main/docs/app-format.md">Full format reference</a> · <a href="/schema/app-v1.json">JSON Schema</a></p>
+        </li>
+        <li>
+          <span class="feature-number">02</span>
+          <h2>Prove it runs</h2>
+          <p><code>check.py --run</code> installs and starts the app exactly like the desktop, then checks every health path.</p>
+          <div class="command-card">
+            <div class="command-header"><span>Terminal</span><span>Python 3, no dependencies</span></div>
+            <pre><code id="check-command">curl -fsSL https://vibedesktop.online/skill.sh | sh &amp;&amp; python3 ~/.claude/skills/vibedesktop-app/scripts/check.py . --run</code></pre>
+            <button class="copy-button" type="button" data-copy-target="check-command">Copy command</button>
+          </div>
+          <p>Using an AI agent? The same command installs the <code>vibedesktop-app</code> skill for Claude Code and Codex. Then ask: <em>“Use vibedesktop-app to make this repository installable from the Vibe Desktop market and verify it.”</em></p>
+        </li>
+        <li>
+          <span class="feature-number">03</span>
+          <h2>Add the topic</h2>
+          <p>Push, then add the GitHub topic <code>vibedesktop-app</code> (repository → About → Topics). The market rebuilds every six hours and lists your app as <strong>Community</strong>.</p>
+          <div class="command-card">
+            <div class="command-header"><span>GitHub CLI</span><span>optional</span></div>
+            <pre><code id="topic-command">gh repo edit --add-topic vibedesktop-app</code></pre>
+            <button class="copy-button" type="button" data-copy-target="topic-command">Copy command</button>
+          </div>
+        </li>
+      </ol>
+
+      <section class="checker" aria-labelledby="checker-title">
+        <p class="eyebrow">MARKET CHECK</p>
+        <h2 id="checker-title">See what the market sees</h2>
+        <p>Checks your repository's default branch with the same validator the desktop uses. Runs in your browser against the public GitHub API.</p>
+        <form class="checker-form" data-checker>
+          <label>
+            <span class="visually-hidden">GitHub repository</span>
+            <input name="repository" placeholder="owner/repo or https://github.com/owner/repo" autocomplete="off" spellcheck="false" required>
+          </label>
+          <button class="button primary" type="submit">Check</button>
+        </form>
+        <div class="checker-result" role="status" aria-live="polite" data-checker-result></div>
+      </section>
+
+      <section class="boundary" aria-labelledby="review-title">
+        <p class="eyebrow">REVIEWED BADGE</p>
+        <h2 id="review-title">Want the Reviewed badge? Run the check above, then request a review of one exact commit.</h2>
+        <p>A review covers a single commit, and the market installs that commit until the next review. Users always see the commands before anything runs, whatever the badge.</p>
+      </section>
+    </main>
+
+    <footer>
+      <div class="brand footer-brand">
+        <img src="/icon.svg" width="32" height="32" alt="">
+        <span>Vibe Desktop</span>
+      </div>
+      <p>No account, no form, no server: the market is built from public GitHub data.</p>
+      <div>
+        <a href="https://github.com/vimalinx/vibedesktop/blob/main/docs/app-format.md">Format</a>
+        <a href="https://github.com/vimalinx/vibedesktop/tree/main/skills/vibedesktop-app">Skill source</a>
+        <a href="https://github.com/vimalinx/vibedesktop/tree/main/market">Market source</a>
+      </div>
+    </footer>
+  </body>
+</html>

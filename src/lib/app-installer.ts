@@ -106,11 +106,12 @@ export function buildAppInstaller(): string {
     '  open) exec "$NODE" "$APP/scripts/launch-desktop-chromium.mjs" ;;',
     '  logs) exec journalctl --user -u "$UNIT" -f ;;',
     '  add) exec python3 "$APP/.claude/skills/add_app/add.py" "$@" ;;',
+    '  install|handle-url) exec "$NODE" "$APP/scripts/vibedesktop-install.mjs" "$@" ;;',
     '  scan) exec python3 "$APP/.claude/skills/add_app/scan.py" "$@" ;;',
     '  update) exec "$NODE" "$APP/daemon/release/app-lifecycle.mjs" update --app-root "$APP_ROOT" --repo "$REPO" --npm "$NPM" --unit "$UNIT" "$@" ;;',
     '  rollback) exec "$NODE" "$APP/daemon/release/app-lifecycle.mjs" rollback --app-root "$APP_ROOT" --unit "$UNIT" "$@" ;;',
     '  uninstall) exec "$NODE" "$APP/daemon/release/app-lifecycle.mjs" uninstall --app-root "$APP_ROOT" --bin __VIBEDESKTOP_BIN__ --unit-path "$UNIT_PATH" --desktop-path "$DESKTOP_PATH" --unit "$UNIT" "$@" ;;',
-    "  *) printf '%s\\n' 'Usage: vibedesktop [open|status|start|stop|restart|logs|add <dir> [--plan|--start] [--name NAME]|scan|update|rollback|uninstall]' >&2; exit 2 ;;",
+    "  *) printf '%s\\n' 'Usage: vibedesktop [open|status|start|stop|restart|logs|add <dir> [--plan|--start|--setup] [--name NAME]|install <owner/repo>|scan|update|rollback|uninstall]' >&2; exit 2 ;;",
     "esac",
     ""
   ];
@@ -170,6 +171,20 @@ export function buildAppInstaller(): string {
     "Categories=Utility;",
     "Keywords=vibe;desktop;webapp;local;",
     "StartupNotify=true",
+    ""
+  ];
+  // Hidden handler: an Install button on vibedesktop.online opens `vibedesktop://install?...`,
+  // which only opens the local confirmation dialog.
+  const urlHandlerTemplate = [
+    "[Desktop Entry]",
+    "Type=Application",
+    "Version=1.0",
+    "Name=Vibe Desktop app installer",
+    "Exec=__EXEC__ handle-url %u",
+    "Icon=__ICON__",
+    "Terminal=false",
+    "NoDisplay=true",
+    "MimeType=x-scheme-handler/vibedesktop;",
     ""
   ];
 
@@ -313,6 +328,7 @@ const unitDir = path.join(configHome, "systemd", "user");
 const unitPath = path.join(unitDir, "vibedesktop-app.service");
 const applicationsDir = path.join(dataHome, "applications");
 const desktopPath = path.join(applicationsDir, "vibedesktop.desktop");
+const urlHandlerPath = path.join(applicationsDir, "vibedesktop-url-handler.desktop");
 const iconPath = path.join(appRoot, "current", "public", "icon.svg");
 
 await migrateLegacyReleases();
@@ -407,6 +423,14 @@ const desktopEntry = ${JSON.stringify(desktopEntryTemplate, null, 2)}.map((line)
   .replaceAll("__ICON__", () => iconPath))
   .join("\\n");
 await writeAtomic(desktopPath, Buffer.from(desktopEntry), 0o644);
+const urlHandlerEntry = ${JSON.stringify(urlHandlerTemplate, null, 2)}.map((line) => line
+  .replaceAll("__EXEC__", () => desktopExecArg(vibedesktopBin))
+  .replaceAll("__ICON__", () => iconPath))
+  .join("\\n");
+await writeAtomic(urlHandlerPath, Buffer.from(urlHandlerEntry), 0o644);
+// Best effort: desktops without xdg-utils still get every other part of the install.
+await run("xdg-mime", ["default", path.basename(urlHandlerPath), "x-scheme-handler/vibedesktop"]).catch(() => {});
+await run("update-desktop-database", [applicationsDir]).catch(() => {});
 
 console.log("Installed Vibe Desktop app " + VERSION_ID + " at " + finalVersionDir + ".");
 

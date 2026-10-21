@@ -3,6 +3,50 @@
 All notable user-visible changes are documented here. Vibe Desktop follows
 semantic versioning from the first public 0.2 release onward.
 
+## 0.3.0 - 2026-10-22
+
+Open-source projects can now ship themselves to Vibe Desktop, and users can
+install them with one click — always after reviewing exactly what will run.
+
+### App format
+- A project commits `.vibedesktop/app.json`: install steps, required commands,
+  and its frontend/backend services with ports. Specification:
+  `docs/app-format.md`; JSON Schema at `vibedesktop.online/schema/app-v1.json`.
+- Every service gets `PORT`, `HOST=127.0.0.1`, `VIBE_PORT_<NAME>` for each
+  service, `VIBE_APP_URL`, and a private `VIBE_DATA_DIR` that survives updates.
+- `vibedesktop add <dir>` and **Import project** follow the manifest instead of
+  guessing, report every invalid field at once, and with `--setup` (or the new
+  checkbox) check requirements and run the declared setup steps.
+
+### One-click installs
+- `vibedesktop install owner/repo[@commit]`, **Import project → Install from
+  GitHub**, and `vibedesktop://install?…` links from vibedesktop.online all open
+  the same confirmation dialog: repository, pinned commit, trust tier, every
+  setup and service command, ports, and data folder. Nothing runs before you
+  confirm.
+- The preview fetches the commit without file contents; the install must match
+  the previewed manifest digest. Install, health checks on every declared
+  service, and rollback reuse the local import pipeline. Updates keep data and
+  restart the previous commit when the new one fails. Uninstall keeps data unless
+  asked.
+- The installer registers a hidden `vibedesktop://` handler and starts the
+  desktop when a link arrives while it is stopped. Existing installs get it by
+  re-running the one-line installer once.
+- Protocol 1.2 adds the `market.install` capability (`market.preview`,
+  `market.install`, `market.installs`, `market.uninstall`).
+
+### Market and authors
+- vibedesktop.online gains an app market (`/apps`) built every six hours from
+  GitHub repositories with the topic `vibedesktop-app` — no accounts, no
+  server. Apps are **Community** by default; **Reviewed** covers one exact
+  commit listed in `market/reviewed.json`.
+- `/developers` explains the three steps and checks a repository in the
+  browser with the same validator the desktop uses, then links a review request.
+- The `vibedesktop-app` agent skill (`curl -fsSL https://vibedesktop.online/skill.sh | sh`)
+  lets Claude Code and Codex package a project; its `check.py` validates,
+  scaffolds (`--init`), and test-runs (`--run`) a manifest exactly like the desktop.
+- `examples/fullstack-app` is a complete Node + Python example.
+
 ## 0.2.2 - 2026-10-20
 
 - Installation no longer fails when a `package-lock.json` exists in a parent

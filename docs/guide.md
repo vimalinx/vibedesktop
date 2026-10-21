@@ -36,6 +36,29 @@ To publish a catalog of your own, see [`catalog/README.md`](../catalog/README.md
 npm run catalog:build   # catalog/source.json → dist/catalog.json
 ```
 
+## App market installs
+
+The link catalog above never runs anything. Installable apps are a separate path:
+open-source projects that commit [`.vibedesktop/app.json`](app-format.md).
+
+- **Where installs start:** an **Install** button on
+  [vibedesktop.online/apps](https://vibedesktop.online/apps) (a `vibedesktop://install` link),
+  `vibedesktop install owner/repo[@commit]`, or **Local WebApps → Import project → Install
+  from GitHub**. All three open the same confirmation dialog; a link wakes the desktop first
+  if it is stopped.
+- **What you confirm:** repository, pinned commit, trust tier (Reviewed, Community, or not in
+  the market), required commands and whether they are installed, every setup command, every
+  service command and port, and the data folder.
+- **Where it goes:** source in `~/.local/share/vibedesktop/workspaces/market/<owner>--<repo>/`,
+  data in `~/.local/state/vibedesktop/apps/market/<owner>--<repo>/`. The app then behaves like
+  any imported project: one icon, start/stop together, per-service logs.
+- **Updates and removal:** installing a newer commit keeps the data and restarts the previous
+  commit if the new one fails. `DELETE /api/v1/market-installs/<id>` (or removing the app in
+  Local WebApps) keeps data unless you ask to delete it.
+
+To make your own project installable, see the [app format](app-format.md) and
+[vibedesktop.online/developers](https://vibedesktop.online/developers).
+
 ## Desktop continuity and backups
 
 Minimizing a window keeps its embedded app mounted, including unsaved in-page

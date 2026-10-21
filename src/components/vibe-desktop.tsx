@@ -76,6 +76,8 @@ import { WindowErrorBoundary } from "@/components/window/window-error-boundary";
 import { AddAppDialog } from "@/components/dialogs/add-app-dialog";
 import { EditAppDialog } from "@/components/dialogs/edit-app-dialog";
 import { WallpaperDialog } from "@/components/dialogs/wallpaper-dialog";
+import { MarketInstallDialog } from "@/components/dialogs/market-install-dialog";
+import { marketInstallEvent, readMarketInstallQuery, type MarketInstallRequest } from "@/lib/market-install-request";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -142,6 +144,7 @@ export function VibeDesktop() {
   const [filteredIds, setFilteredIds] = useState<string[] | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [marketRequest, setMarketRequest] = useState<MarketInstallRequest | null>(null);
   const [editingApp, setEditingApp] = useState<DesktopApp | null>(null);
   const [wallpaperOpen, setWallpaperOpen] = useState(false);
   const [closeConfirm, setCloseConfirm] = useState<{
@@ -216,6 +219,25 @@ export function VibeDesktop() {
     },
     [locale, t]
   );
+
+  // `?install=owner/repo&ref=<sha>` (from a vibedesktop:// link or `vibedesktop install`) and the
+  // Local WebApps panel both open the same confirmation dialog. The query is consumed once.
+  useEffect(() => {
+    const fromQuery = readMarketInstallQuery(window.location.search);
+    if (fromQuery) {
+      setMarketRequest(fromQuery);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("install");
+      url.searchParams.delete("ref");
+      window.history.replaceState(window.history.state, "", url);
+    }
+    const onRequest = (event: Event) => {
+      const detail = (event as CustomEvent<MarketInstallRequest>).detail;
+      if (detail?.repository) setMarketRequest(detail);
+    };
+    window.addEventListener(marketInstallEvent, onRequest);
+    return () => window.removeEventListener(marketInstallEvent, onRequest);
+  }, []);
 
   const refreshLocalApps = useCallback(async () => {
     if (refreshPending.current) return;
@@ -1334,6 +1356,21 @@ export function VibeDesktop() {
               rememberLocalAsset(`app:${localIcon.appId}:icon`, localIcon.url);
             }
             setAddOpen(false);
+          }}
+        />
+      ) : null}
+
+      {marketRequest ? (
+        <MarketInstallDialog
+          key={`${marketRequest.repository}@${marketRequest.ref ?? "HEAD"}`}
+          repository={marketRequest.repository}
+          gitRef={marketRequest.ref}
+          t={t}
+          onClose={() => setMarketRequest(null)}
+          onInstalled={() => void refreshLocalApps()}
+          onOpen={(status) => {
+            setMarketRequest(null);
+            if (status.appId && status.url) openUrlApp({ id: status.appId, url: status.url, title: status.name });
           }}
         />
       ) : null}

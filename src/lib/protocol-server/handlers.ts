@@ -10,6 +10,9 @@ import * as catalogAddRoute from "@/app/api/app-directory/[id]/add/route";
 import * as installsRoute from "@/app/api/catalog-installs/route";
 import * as installRoute from "@/app/api/catalog-installs/[id]/route";
 import * as agentInstructionRoute from "@/app/api/catalog-installs/[id]/agent-instruction/route";
+import * as marketInstallsRoute from "@/app/api/market-installs/route";
+import * as marketPreviewRoute from "@/app/api/market-installs/preview/route";
+import * as marketInstallRoute from "@/app/api/market-installs/[id]/route";
 import * as metadataRoute from "@/app/api/apps/metadata/resolve/route";
 import * as embedRoute from "@/app/api/apps/metadata/embed/route";
 import * as localAppsRoute from "@/app/api/local-apps/route";
@@ -44,6 +47,10 @@ export const handlers = {
   "catalog.install": installRoute.POST,
   "catalog.uninstall": installRoute.DELETE,
   "catalog.agentInstruction": agentInstructionRoute.GET,
+  "market.preview": marketPreviewRoute.POST,
+  "market.installs": marketInstallsRoute.GET,
+  "market.install": marketInstallsRoute.POST,
+  "market.uninstall": marketInstallRoute.DELETE,
   "url.resolve": metadataRoute.POST,
   "url.embed": embedRoute.POST,
   "localApps.list": localAppsRoute.GET,

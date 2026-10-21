@@ -23,6 +23,9 @@ const runtimeFiles = [
   "browser-extension",
   "catalog/installers",
   "scripts/launch-desktop-chromium.mjs",
+  "scripts/vibedesktop-install.mjs",
+  // The install link parser shared with the server; the CLI imports it by this path.
+  "src/lib/app-manifest.mjs",
   "LICENSE",
   "THIRD_PARTY_NOTICES.md"
 ];

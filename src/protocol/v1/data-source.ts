@@ -12,6 +12,8 @@ import type {
   LocalAppImportPlan,
   LocalAppImportResult,
   LocalAppView,
+  MarketInstallPreview,
+  MarketInstallStatus,
   MetadataResolveResult,
   OpeningMode,
   ShellStyle,
@@ -50,6 +52,8 @@ export interface DesktopDataSource {
   listCatalog(): Promise<AppDirectoryItem[]>;
   addCatalogApp(itemId: string): Promise<DesktopPayload>;
   readonly catalogInstalls: CatalogInstallsCapability;
+  /** Apps from GitHub that declare `.vibedesktop/app.json`, pinned to one commit. */
+  readonly marketInstalls: MarketInstallsCapability;
 
   /** URL inspection performed by the local server inside its SSRF guard. */
   readonly urlMetadata: UrlMetadataCapability;
@@ -74,6 +78,13 @@ export interface CatalogInstallsCapability {
   install(itemId: string): Promise<CatalogWorkspaceInstallStatus>;
   uninstall(itemId: string, purgeData?: boolean): Promise<CatalogWorkspaceInstallStatus>;
   agentInstruction(itemId: string): Promise<CatalogAgentInstallInstruction>;
+}
+
+export interface MarketInstallsCapability {
+  preview(repository: string, ref?: string | null): Promise<MarketInstallPreview>;
+  list(): Promise<MarketInstallStatus[]>;
+  install(input: { repository: string; ref: string; digest: string }): Promise<MarketInstallStatus>;
+  uninstall(id: string, purgeData?: boolean): Promise<MarketInstallStatus>;
 }
 
 export interface CreateUrlAppInput {
@@ -160,7 +171,7 @@ export interface LocalAppsCapability {
   /** Detects the services in a project directory without registering anything. */
   planImport(input: LocalAppImportInput): Promise<LocalAppImportPlan>;
   /** Generates the bundle, registers it, and with `start` verifies health or rolls back. */
-  importProject(input: LocalAppImportInput & { start: boolean }): Promise<LocalAppImportResult>;
+  importProject(input: LocalAppImportInput & { start: boolean; setup?: boolean }): Promise<LocalAppImportResult>;
   /** The generated launch bundle; `null` for apps that were not imported from a project. */
   bundle(id: string): Promise<LocalAppBundle | null>;
   /** Fetches the app's own favicon bytes. Returns null when none was found. */

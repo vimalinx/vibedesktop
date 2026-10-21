@@ -37,7 +37,7 @@ describe("GET /api/setup/app", () => {
   });
 
   it("exposes the documented CLI subcommands and the systemd unit name", () => {
-    const usage = "vibedesktop [open|status|start|stop|restart|logs|add <dir> [--plan|--start] [--name NAME]|scan|update|rollback|uninstall]";
+    const usage = "vibedesktop [open|status|start|stop|restart|logs|add <dir> [--plan|--start|--setup] [--name NAME]|install <owner/repo>|scan|update|rollback|uninstall]";
     expect(installer).toContain(usage);
     expect(installer).toContain("vibedesktop-app.service");
     expect(installer).toContain("vibedesktop-run");

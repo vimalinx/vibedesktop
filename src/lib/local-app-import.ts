@@ -9,6 +9,8 @@ const MAX_BUNDLE_FILE_BYTES = 256 * 1024;
 const PLAN_TIMEOUT_MS = 30_000;
 // Registration plus `--start` waits up to 30s for health inside add.py.
 const IMPORT_TIMEOUT_MS = 90_000;
+// Declared setup steps (dependency installs) are bounded by add.py at 30 minutes each.
+const SETUP_IMPORT_TIMEOUT_MS = 40 * 60_000;
 
 export type LocalAppImportErrorCode =
   | "invalid_request"
@@ -17,6 +19,9 @@ export type LocalAppImportErrorCode =
   | "conflict"
   | "daemon_unreachable"
   | "rolled_back"
+  | "invalid_manifest"
+  | "requirements_missing"
+  | "setup_failed"
   | "import_failed";
 
 export class LocalAppImportError extends Error {
@@ -31,8 +36,8 @@ export class LocalAppImportError extends Error {
 }
 
 export function localAppImportErrorStatus(code: LocalAppImportErrorCode): number {
-  if (code === "invalid_request" || code === "not_detected") return 400;
-  if (code === "already_registered" || code === "conflict") return 409;
+  if (code === "invalid_request" || code === "not_detected" || code === "invalid_manifest") return 400;
+  if (code === "already_registered" || code === "conflict" || code === "requirements_missing") return 409;
   if (code === "daemon_unreachable") return 503;
   return 502;
 }
@@ -56,11 +61,11 @@ export async function planLocalAppImport(
 
 /** Generate, register, and optionally start-and-verify one project bundle. add.py rolls back failures. */
 export async function importLocalAppProject(
-  input: { path: string; name?: string; start: boolean },
+  input: { path: string; name?: string; start: boolean; setup?: boolean },
   options: LocalAppImportOptions = {}
 ): Promise<LocalAppImportResult> {
-  const args = [projectPath(input.path), ...(input.start ? ["--start"] : []), ...nameArgs(input.name)];
-  const result = await runAdd(args, IMPORT_TIMEOUT_MS, options);
+  const args = [projectPath(input.path), ...(input.start ? ["--start"] : []), ...(input.setup ? ["--setup"] : []), ...nameArgs(input.name)];
+  const result = await runAdd(args, input.setup ? SETUP_IMPORT_TIMEOUT_MS : IMPORT_TIMEOUT_MS, options);
   if (result.status !== "registered" && result.status !== "started") {
     throw new LocalAppImportError("import_failed", "The importer returned an unexpected result.");
   }
@@ -184,11 +189,15 @@ async function runAdd(args: string[], timeoutMs: number, options: LocalAppImport
   }
   if (result.ok === true) return result;
 
-  const message = boundedString(result.message, 2000) ?? "The project could not be imported.";
+  const errors = Array.isArray(result.errors) ? result.errors.filter((item): item is string => typeof item === "string").slice(0, 20) : [];
+  const summary = boundedString(result.message, 2000) ?? "The project could not be imported.";
+  // An invalid .vibedesktop/app.json lists every problem, one per line, so it can be fixed in one pass.
+  const message = errors.length ? `.vibedesktop/app.json is invalid:\n${errors.map((line) => `- ${line}`).join("\n")}` : summary;
   const status = result.status;
   const code: LocalAppImportErrorCode =
     status === "not_detected" || status === "already_registered" || status === "conflict" ||
-    status === "daemon_unreachable" || status === "rolled_back"
+    status === "daemon_unreachable" || status === "rolled_back" || status === "invalid_manifest" ||
+    status === "requirements_missing" || status === "setup_failed"
       ? status
       : "import_failed";
   throw new LocalAppImportError(code, message);
@@ -226,7 +235,18 @@ function normalizePlan(value: unknown): LocalAppImportPlan {
   const notes = Array.isArray(raw.notes)
     ? raw.notes.slice(0, 20).map((note) => boundedString(note, 500)).filter((note): note is string => note !== null)
     : [];
-  return { name, projectRoot, bundleDir, services, notes };
+  const declared = normalizeDeclared(raw.declared);
+  return { name, projectRoot, bundleDir, services, notes, ...(declared ? { declared } : {}) };
+}
+
+function normalizeDeclared(value: unknown): LocalAppImportPlan["declared"] | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = value as Record<string, unknown>;
+  const list = (items: unknown, max: number) => Array.isArray(items)
+    ? items.slice(0, 12).map((item) => boundedString(item, max)).filter((item): item is string => item !== null)
+    : [];
+  const dataDir = boundedString(raw.dataDir, 4096);
+  return dataDir ? { requires: list(raw.requires, 40), setup: list(raw.setup, 1000), dataDir } : undefined;
 }
 
 function normalizeServices(value: unknown): LocalAppBundleService[] {

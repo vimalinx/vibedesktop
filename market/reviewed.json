@@ -1,0 +1,4 @@
+{
+  "$comment": "Apps the maintainer reviewed. Each review covers exactly one commit; the market installs that commit. Add entries only through a reviewed pull request.",
+  "reviewed": []
+}

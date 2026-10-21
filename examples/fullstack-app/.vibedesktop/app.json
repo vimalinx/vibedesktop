@@ -1,0 +1,17 @@
+{
+  "$schema": "https://vibedesktop.online/schema/app-v1.json",
+  "schemaVersion": 1,
+  "name": "Fullstack Example",
+  "description": "A Node frontend and a Python API, installed and supervised as one app.",
+  "icon": "icon.svg",
+  "category": "developer-tools",
+  "requires": ["node", "python3"],
+  "setup": [
+    "node --check web/server.mjs",
+    "python3 -m py_compile api/app.py"
+  ],
+  "services": [
+    { "name": "web", "cwd": "web", "run": "node server.mjs --port $PORT", "port": 4310 },
+    { "name": "api", "cwd": "api", "run": "python3 app.py", "port": 4311, "health": "/api/health" }
+  ]
+}

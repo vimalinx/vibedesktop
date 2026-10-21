@@ -20,6 +20,8 @@ import type {
 import { saveLocalAsset } from "@/lib/browser-local-assets";
 import { desktopData, reasonFor } from "@/lib/desktop-data";
 import { initialsForTitle } from "@/lib/desktop-helpers";
+import { parseGithubRepository } from "@/lib/app-manifest.mjs";
+import { requestMarketInstall } from "@/lib/market-install-request";
 import styles from "./local-apps-panel.module.css";
 
 interface LocalAppsText {
@@ -77,6 +79,15 @@ interface LocalAppsText {
   importPathPlaceholder: string;
   importName: string;
   importNamePlaceholder: string;
+  declaredFrom: string;
+  runSetup: (count: number) => string;
+  settingUp: string;
+  githubTitle: string;
+  githubHint: string;
+  githubPlaceholder: string;
+  githubInvalid: string;
+  githubButton: string;
+  browseMarket: string;
   preview: string;
   previewing: string;
   planSummary: (services: number) => string;
@@ -192,6 +203,15 @@ const TEXT: Record<"en" | "zh", LocalAppsText> = {
     importPathPlaceholder: "~/Projects/my-app",
     importName: "Name (optional)",
     importNamePlaceholder: "Defaults to the directory name",
+    declaredFrom: "Declared by the project's .vibedesktop/app.json",
+    runSetup: (count) => `Run its ${count} setup step${count === 1 ? "" : "s"} first (installs dependencies)`,
+    settingUp: "Running setup steps…",
+    githubTitle: "Or install from GitHub",
+    githubHint: "For projects that ship .vibedesktop/app.json. You review every command before anything runs.",
+    githubPlaceholder: "owner/repo or https://github.com/owner/repo",
+    githubInvalid: "Enter a GitHub repository such as owner/repo.",
+    githubButton: "Review and install",
+    browseMarket: "Browse the app market",
     preview: "Preview",
     previewing: "Detecting…",
     planSummary: (services) => `${services} service${services === 1 ? "" : "s"} will start together and stop together.`,
@@ -305,6 +325,15 @@ const TEXT: Record<"en" | "zh", LocalAppsText> = {
     importPathPlaceholder: "~/Projects/my-app",
     importName: "名称（可选）",
     importNamePlaceholder: "默认使用目录名",
+    declaredFrom: "来自项目自带的 .vibedesktop/app.json",
+    runSetup: (count) => `先运行它的 ${count} 个安装步骤（安装依赖）`,
+    settingUp: "正在运行安装步骤…",
+    githubTitle: "或者从 GitHub 安装",
+    githubHint: "适用于带有 .vibedesktop/app.json 的项目。运行任何命令前，你都会先看到完整清单。",
+    githubPlaceholder: "owner/repo 或 https://github.com/owner/repo",
+    githubInvalid: "请输入 GitHub 仓库，例如 owner/repo。",
+    githubButton: "查看并安装",
+    browseMarket: "逛逛应用市场",
     preview: "预览",
     previewing: "正在识别…",
     planSummary: (services) => `${services} 个服务将一起启动、一起停止。`,
@@ -865,7 +894,9 @@ function ProjectImport({
   const [plan, setPlan] = useState<LocalAppImportPlan | null>(null);
   const [busy, setBusy] = useState<"plan" | "register" | "start" | null>(null);
   const [error, setError] = useState("");
+  const [runSetup, setRunSetup] = useState(true);
   const input = { path: projectPath.trim(), ...(name.trim() ? { name: name.trim() } : {}) };
+  const setup = Boolean(plan?.declared?.setup.length) && runSetup;
 
   async function preview() {
     if (!input.path) return;
@@ -885,7 +916,7 @@ function ProjectImport({
     setBusy(start ? "start" : "register");
     setError("");
     try {
-      const result = await runActivity(`${plan?.name ?? input.path} · import`, () => localApps.importProject({ ...input, start }));
+      const result = await runActivity(`${plan?.name ?? input.path} · import`, () => localApps.importProject({ ...input, start, ...(setup ? { setup: true } : {}) }));
       await onImported(result);
     } catch (failure) {
       setError(failureMessage(failure, t.toast.failed));
@@ -950,6 +981,8 @@ function ProjectImport({
         </button>
       </form>
 
+      <GithubInstall t={t} />
+
       {error ? <p className="local-app-error" role="alert">{error}</p> : null}
 
       {plan ? (
@@ -958,6 +991,20 @@ function ProjectImport({
             <strong>{plan.name}</strong> · {t.planSummary(plan.services.length)}
           </p>
           <ServiceList services={plan.services} t={t} />
+          {plan.declared ? (
+            <div className="project-import-declared">
+              <p>{t.declaredFrom}{plan.declared.requires.length ? ` · ${plan.declared.requires.join(", ")}` : ""}</p>
+              {plan.declared.setup.length ? (
+                <>
+                  <ol>{plan.declared.setup.map((command, index) => <li key={index}><code>{command}</code></li>)}</ol>
+                  <label className="checkbox-field">
+                    <input type="checkbox" checked={runSetup} onChange={(event) => setRunSetup(event.target.checked)} />
+                    <span>{t.runSetup(plan.declared.setup.length)}</span>
+                  </label>
+                </>
+              ) : null}
+            </div>
+          ) : null}
           {plan.notes.length > 0 ? (
             <ul className="project-import-notes">
               {plan.notes.map((note) => <li key={note}>{note}</li>)}
@@ -969,15 +1016,48 @@ function ProjectImport({
           </p>
           <div className="dialog-actions">
             <button type="button" disabled={busy !== null} onClick={() => register(false)}>
-              {busy === "register" ? t.importing : t.registerOnly}
+              {busy === "register" ? (setup ? t.settingUp : t.importing) : t.registerOnly}
             </button>
             <button type="button" className="primary-action" disabled={busy !== null} onClick={() => register(true)}>
-              {busy === "start" ? t.startingImport : t.registerAndStart}
+              {busy === "start" ? (setup ? t.settingUp : t.startingImport) : t.registerAndStart}
             </button>
           </div>
         </div>
       ) : null}
     </section>
+  );
+}
+
+function GithubInstall({ t }: { t: LocalAppsText }) {
+  const [repository, setRepository] = useState("");
+  const [invalid, setInvalid] = useState(false);
+  return (
+    <form
+      className="project-import-github"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const parsed = parseGithubRepository(repository);
+        setInvalid(!parsed);
+        if (parsed) requestMarketInstall({ repository: parsed.slug, ref: null });
+      }}
+    >
+      <label className="dialog-label">
+        {t.githubTitle}
+        <input
+          value={repository}
+          onChange={(event) => { setRepository(event.target.value); setInvalid(false); }}
+          placeholder={t.githubPlaceholder}
+          spellCheck={false}
+          autoComplete="off"
+          aria-invalid={invalid || undefined}
+        />
+      </label>
+      <button type="submit" disabled={!repository.trim()}>{t.githubButton}</button>
+      <p className="project-import-github-hint">
+        {invalid ? t.githubInvalid : t.githubHint}{" "}
+        <a href="https://vibedesktop.online/apps" target="_blank" rel="noreferrer">{t.browseMarket} ↗</a>
+      </p>
+    </form>
   );
 }
 
@@ -1521,6 +1601,29 @@ const localAppsStyles = `
   background: var(--la-accent);
 }
 .project-import button:disabled { opacity: 0.45; cursor: not-allowed; }
+.project-import-declared { display: grid; gap: var(--space-2); border: 1px solid var(--la-line); border-radius: var(--radius-control); padding: var(--space-2) var(--space-3); font-size: 0.74rem; color: var(--la-muted); }
+.project-import-declared p { margin: 0; }
+.project-import-declared ol { display: grid; gap: var(--space-1); margin: 0; padding-inline-start: var(--space-4); }
+.project-import-declared code { font-family: var(--type-mono); font-size: 0.7rem; color: var(--la-ink); overflow-wrap: anywhere; }
+.project-import-github {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--la-line);
+  padding-top: var(--space-3);
+}
+.project-import-github input { width: 100%; min-width: 0; font-family: var(--type-mono); }
+.project-import-github button {
+  min-height: 44px;
+  border: 1px solid var(--la-line);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-3);
+  color: var(--la-ink);
+  background: var(--la-surface-2);
+}
+.project-import-github-hint { grid-column: 1 / -1; margin: 0; color: var(--la-muted); font-size: 0.72rem; line-height: 1.4; }
+.project-import-github-hint a { color: var(--la-ink); }
 .project-import-plan { display: grid; gap: var(--space-3); }
 .project-import-summary { margin: 0; font-size: 0.8rem; color: var(--la-muted); }
 .project-import-summary strong { color: var(--la-ink); }

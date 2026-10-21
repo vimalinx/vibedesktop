@@ -11,13 +11,14 @@ export async function POST(request: Request) {
   if (csrf) return csrf;
   try {
     await requireCurrentUser();
-    const body = (await readJsonObject(request)) as null | { path?: unknown; name?: unknown; start?: unknown };
+    const body = (await readJsonObject(request)) as null | { path?: unknown; name?: unknown; start?: unknown; setup?: unknown };
     if (!body) return invalidJsonBody();
     if (typeof body.path !== "string") return apiError(400, "invalid_request", "path is required");
     if (typeof body.start !== "boolean") return apiError(400, "invalid_request", "start must be a boolean");
     const result = await importLocalAppProject({
       path: body.path,
       start: body.start,
+      setup: body.setup === true,
       ...(typeof body.name === "string" ? { name: body.name } : {})
     });
     return NextResponse.json({ result }, { status: 201 });

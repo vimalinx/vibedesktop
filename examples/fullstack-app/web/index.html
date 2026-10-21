@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fullstack Example</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; margin: 0; background: #0f172a; color: #e2e8f0; }
+  main { text-align: center; }
+  button { font: inherit; padding: .6em 1.4em; border-radius: 10px; border: 0; background: #2563eb; color: #fff; cursor: pointer; }
+</style>
+<main>
+  <h1>Fullstack Example</h1>
+  <p>Visits stored by the Python API: <strong id="count">…</strong></p>
+  <button id="visit">Count a visit</button>
+</main>
+<script>
+  const count = document.getElementById("count");
+  const show = (data) => { count.textContent = String(data.visits); };
+  fetch("/api/visits").then((r) => r.json()).then(show);
+  document.getElementById("visit").onclick = () => fetch("/api/visits", { method: "POST" }).then((r) => r.json()).then(show);
+</script>
+</html>

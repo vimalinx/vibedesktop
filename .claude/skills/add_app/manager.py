@@ -64,6 +64,9 @@ def build_manifest(name: str, project_root: str, services: list[dict]) -> dict:
             "cwd": str(Path(cwd).expanduser().resolve()),
             "port": port,
             "framework": str(service.get("framework") or "unknown"),
+            # Only `.vibedesktop/app.json` services carry these: their declared environment and health path.
+            **({"env": {str(key): str(value) for key, value in service["env"].items()}} if service.get("env") else {}),
+            **({"health": str(service["health"])} if service.get("health") else {}),
         })
     return {
         "schemaVersion": SCHEMA_VERSION,
@@ -103,6 +106,8 @@ def render_wrapper(manifest: dict) -> str:
             f"printf '%s\\n' {shlex.quote('[vibedesktop] starting ' + service['name'] + ' on :' + str(service['port']))}",
             "(",
             f"  cd {shlex.quote(service['cwd'])}",
+            *[f"  export {key}={shlex.quote(value)}" for key, value in (service.get("env") or {}).items()],
+            *(['  mkdir -p -m 700 "$VIBE_DATA_DIR"'] if "VIBE_DATA_DIR" in (service.get("env") or {}) else []),
             *([f"  exec > >(while IFS= read -r line; do printf '%s %s\\n' {tag} \"$line\"; done) 2>&1"] if tagged else []),
             f"  exec {command}",
             ") &",

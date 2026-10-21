@@ -6,7 +6,7 @@ const origin = "http://127.0.0.1:3000";
 beforeEach(() => { vi.clearAllMocks(); handler.mockResolvedValue(Response.json({ user: null })); });
 it("stamps discovery and keeps unknown routes outside the protocol", async () => {
   const discovery = await handleProtocolRequest(new Request(origin + "/api/v1"));
-  expect(discovery.headers.get("x-vibe-protocol")).toBe("1.1");
+  expect(discovery.headers.get("x-vibe-protocol")).toBe("1.2");
   expect((await discovery.json()).operations["desktop.read"].path).toBe("/desktop");
   expect((await handleProtocolRequest(new Request(origin), ["setup"])).status).toBe(404);
 });

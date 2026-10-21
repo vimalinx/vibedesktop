@@ -3,6 +3,7 @@ import { apiError, rejectCrossOriginMutation, invalidJsonBody, readJsonObject } 
 import { AuthRequiredError, requireCurrentUser } from "@/lib/auth";
 import { DaemonApiError, DaemonTimeoutError, DaemonUnreachableError, deleteLocalApp, getLocalApp, updateLocalApp } from "@/lib/daemon-client";
 import { removeLocalAppBundle } from "@/lib/local-app-import";
+import { forgetMarketSource } from "@/lib/market-installer";
 import type { IconKind } from "@/lib/contracts";
 
 export const runtime = "nodejs";
@@ -67,10 +68,12 @@ export async function DELETE(request: Request, context: RouteContext) {
   try {
     await requireCurrentUser();
     const { id } = await context.params;
-    const { command } = await getLocalApp(id);
+    const { command, cwd } = await getLocalApp(id);
     await deleteLocalApp(id);
     // A project-imported app owns its generated run.sh bundle; re-importing regenerates it.
     await removeLocalAppBundle(command).catch(() => false);
+    // A market install also owns its pinned source checkout (its data folder is kept).
+    await forgetMarketSource(cwd).catch(() => undefined);
     return NextResponse.json({ deleted: id });
   } catch (error) {
     return handleError(error);

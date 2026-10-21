@@ -55,6 +55,42 @@ vibedesktop scan                            # 列出本机已有的可启动 Web
 AI Agent（Claude Code、Codex 等）通过自带的 `add-app` 技能也能做同样的事：
 *“用 add-app 把 ~/Projects/my-webui 加到 Vibe Desktop 并验证。”*
 
+## 应用市场
+
+[vibedesktop.online/apps](https://vibedesktop.online/apps) 收录了自带 `.vibedesktop/app.json` 的开源项目。
+点 **安装** 会唤起你电脑上的 Vibe Desktop（没运行就先启动它），弹出确认窗口：要安装的确切提交、
+每一条安装命令、每个服务和端口、数据存在哪里，全部列清楚。你点确认之前什么都不会运行。
+确认后自动安装、启动、做健康检查、出现在桌面上；任何一步失败都会完整回滚。
+
+```bash
+vibedesktop install owner/repo          # 在终端里打开同一个确认窗口
+```
+
+也可以在 **本地 WebApp → 导入项目 → 从 GitHub 安装** 里直接粘贴仓库地址。更新会保留数据，
+新版本起不来会自动换回旧版本。
+
+## 让你的项目可以被一键安装
+
+只需要提交一个文件、加一个 GitHub topic：
+
+```json
+{
+  "schemaVersion": 1,
+  "name": "Notes AI",
+  "setup": ["npm ci --prefix web", "uv sync --directory server --frozen"],
+  "services": [
+    { "name": "web", "cwd": "web", "run": "npm run dev -- --port $PORT", "port": 5173 },
+    { "name": "api", "cwd": "server", "run": "uv run uvicorn app:app --port 8000", "port": 8000 }
+  ]
+}
+```
+
+保存为 `.vibedesktop/app.json`，用 `check.py --run` 验证能跑起来，推送，再给仓库加上 topic
+`vibedesktop-app`，6 小时内就会出现在市场里——不需要账号，也不需要填表。AI Agent 装上
+`vibedesktop-app` 技能（`curl -fsSL https://vibedesktop.online/skill.sh | sh`）就能替你完成全部步骤。
+完整格式见 [docs/app-format.md](docs/app-format.md)，在线检查：
+[vibedesktop.online/developers](https://vibedesktop.online/developers)。
+
 ## 支持的技术栈
 
 | | 自动识别 |
@@ -85,6 +121,7 @@ AI Agent（Claude Code、Codex 等）通过自带的 `add-app` 技能也能做�
 | | |
 | --- | --- |
 | **只在本机** | 只监听 127.0.0.1，拒绝其他主机名的请求，防住 DNS 重绑定攻击；拒绝跨站写入。没有账号、没有遥测、不上云。 |
+| **安装要确认** | 市场链接只能打开确认窗口。运行任何东西之前，你都能看到锁定的提交、每条命令和每个端口。见[安全模型](SECURITY.md#security-model)。 |
 | **安全更新** | 每次安装或更新都先在独立目录构建、健康检查，再原子切换。新版本起不来自动回到上一版；`vibedesktop rollback` 不需要联网。 |
 | **崩溃隔离** | 某个窗口出错只显示一张可恢复的卡片，不会让整个桌面白屏。访问 `/?safe=1` 可以不恢复上次的窗口启动。 |
 | **数据可靠** | 配置写入时先落盘同步，并保留上一份完好的副本。断电导致文件损坏时，坏文件另存、自动用上一份恢复，不会因此启动失败。 |
@@ -100,7 +137,8 @@ AI Agent（Claude Code、Codex 等）通过自带的 `add-app` 技能也能做�
 ```bash
 vibedesktop open | status | logs
 vibedesktop start | stop | restart
-vibedesktop add <目录> [--plan | --start] [--name 名称]
+vibedesktop add <目录> [--plan | --start] [--setup] [--name 名称]
+vibedesktop install <owner/repo>[@<提交>]   # 从 GitHub 查看并安装
 vibedesktop scan
 vibedesktop update      # 拉取最新版本、构建、切换、健康检查，失败自动回滚
 vibedesktop rollback    # 回到上一个版本，不需要联网

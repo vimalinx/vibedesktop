@@ -22,6 +22,12 @@ python3 "$SKILL_DIR/add.py" <path-or-port> --start
 If the runtime does not provide `SKILL_DIR`, use the directory containing this
 `SKILL.md`. A target may be a project directory, `cwd`, `:4321`, or `4321`.
 
+When the project ships `.vibedesktop/app.json` (the Vibe Desktop app format,
+`docs/app-format.md`), its declared services, ports, and environment are used
+instead of detection, and an invalid file is reported field by field. Add
+`--setup` to check its `requires` and run its `setup` commands before
+registering; show those commands to the user from `--plan` first.
+
 `add.py` writes a private manifest plus `run.sh` under the user's XDG data
 directory, registers that wrapper with `vibed`, starts it when `--start` is
 present, and waits for the primary WebUI to become healthy. A failed verified
