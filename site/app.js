@@ -1,6 +1,26 @@
 /* vibedesktop.online — one script for every page. Everything that comes from
    GitHub or market.json is inserted with textContent, never as HTML. */
 
+/* Inside a desktop window (/apps?embed=1) a page drops its own header and
+   hands site navigation back to the desktop around it. */
+const SITE_ROUTES = new Set(["/", "/apps", "/developers"]);
+if (new URLSearchParams(location.search).has("embed") && window.parent !== window) {
+  document.documentElement.classList.add("is-embedded");
+  document.addEventListener("click", (event) => {
+    const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+    if (!link) return;
+    const url = new URL(link.href, location.href);
+    if (url.protocol === "vibedesktop:") return;
+    if (url.origin === location.origin && SITE_ROUTES.has(url.pathname)) {
+      event.preventDefault();
+      window.parent.postMessage({ type: "vd:navigate", path: url.pathname + url.hash }, location.origin);
+    } else {
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+    }
+  });
+}
+
 for (const button of document.querySelectorAll("[data-copy-target]")) {
   button.addEventListener("click", () => copyFrom(button));
 }

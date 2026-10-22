@@ -14,6 +14,8 @@
 ![Node.js 20+](https://img.shields.io/badge/node-%E2%89%A520-339933)
 ![Local only](https://img.shields.io/badge/runs-100%25%20local-success)
 
+**[在线体验 →](https://vibedesktop.online)**：一个能直接上手玩的网页桌面，附带互动教程。
+
 [English](README.md) · 简体中文
 
 <img src="docs/images/local-apps.png" alt="本地应用管理界面：Vite 前端和 Flask 后端作为一个应用运行" width="900" />

@@ -3,6 +3,25 @@
 All notable user-visible changes are documented here. Vibe Desktop follows
 semantic versioning from the first public 0.2 release onward.
 
+## 0.3.1 - 2026-10-22
+
+The desktop itself is unchanged; this release publishes the new website.
+
+### vibedesktop.online
+- The home page is now a playable web preview of the desktop: draggable,
+  resizable windows with edge snapping, a dock, Ctrl/⌘ K search, work scenes,
+  and a layout that survives a refresh. Chinese and English.
+- **Star Guide**: an eight-chapter interactive tutorial drawn as a
+  constellation. Missions are real actions on the preview, and faithful
+  simulations show importing a project, crash recovery, a market install with
+  rollback, an app.json bug hunt against the real validator, and the security
+  boundary.
+- Art toys and sites: Ink (flow-field brush painting), Sound Garden (a circular
+  pentatonic sequencer), four generative wallpapers, and a gallery of websites
+  that can be opened in windows or pinned to the desktop.
+- `/apps` and `/developers` open inside desktop windows; `/#install` and
+  `/?open=tutorial&chapter=import` deep-link into the preview.
+
 ## 0.3.0 - 2026-10-22
 
 Open-source projects can now ship themselves to Vibe Desktop, and users can

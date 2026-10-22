@@ -170,6 +170,10 @@ footer > div:last-child { display: flex; justify-content: flex-end; gap: 22px; }
 .market-teaser .section-zh { color: var(--dim); }
 .teaser-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 
+/* ----- Inside a desktop window ----- */
+.is-embedded .skip-link, .is-embedded .site-header, .is-embedded footer { display: none; }
+.is-embedded .page { padding-block: 28px 36px; }
+
 /* ----- Market ----- */
 .market-notice { margin-bottom: 28px; border: 1px solid var(--line); border-left: 4px solid var(--blue); border-radius: 12px; padding: 14px 18px; color: var(--muted); font-size: .88rem; background: var(--surface); }
 .market-notice strong { color: var(--ink); }

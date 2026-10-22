@@ -1,11 +1,34 @@
 /*
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'self' https://api.github.com https://raw.githubusercontent.com; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; frame-src 'self' https:; object-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'self' https://api.github.com https://raw.githubusercontent.com; upgrade-insecure-requests
   Permissions-Policy: camera=(), geolocation=(), microphone=(), payment=(), usb=()
   Referrer-Policy: strict-origin-when-cross-origin
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
 
 /icon.svg
+  Cache-Control: public, max-age=86400
+
+# The desktop at / shows this page inside a window, so it may be framed by this site only.
+/apps
+  ! Content-Security-Policy
+  ! X-Frame-Options
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'self'; frame-src 'self' https:; object-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'self' https://api.github.com https://raw.githubusercontent.com; upgrade-insecure-requests
+  X-Frame-Options: SAMEORIGIN
+
+# The desktop at / shows this page inside a window, so it may be framed by this site only.
+/developers
+  ! Content-Security-Policy
+  ! X-Frame-Options
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'self'; frame-src 'self' https:; object-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'self' https://api.github.com https://raw.githubusercontent.com; upgrade-insecure-requests
+  X-Frame-Options: SAMEORIGIN
+
+/desktop.css
+  Cache-Control: public, max-age=3600
+
+/desktop/*
+  Cache-Control: public, max-age=3600
+
+/ui/*
   Cache-Control: public, max-age=86400
 
 /styles.css

@@ -14,6 +14,8 @@ checks they are healthy, and gives you one icon to open, stop, restart, and debu
 ![Node.js 20+](https://img.shields.io/badge/node-%E2%89%A520-339933)
 ![Local only](https://img.shields.io/badge/runs-100%25%20local-success)
 
+**[Try the web preview →](https://vibedesktop.online)** — a playable desktop with an interactive guide.
+
 English · [简体中文](README.zh-CN.md)
 
 <img src="docs/images/local-apps.png" alt="The Local WebApps manager showing a Vite frontend and Flask backend running as one app" width="900" />

@@ -1,153 +1,74 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Vibe Desktop runs every local frontend + backend project as one desktop app: import a folder or install from the app market, start and stop it as one, and see its health and logs. Open source, local only.">
-    <meta name="theme-color" content="#0c0e0f">
-    <title>Vibe Desktop — one desktop for your local frontend + backend apps</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="description" content="Vibe Desktop 把本机所有前后端分离的项目管成桌面上的一个图标：一起启动、一起停止、健康检查、分服务日志。在线体验它的网页桌面。Vibe Desktop runs every local frontend + backend project as one desktop app. Try the web preview.">
+    <meta name="theme-color" content="#0b0f1c">
+    <meta property="og:title" content="Vibe Desktop — 把前后端分离的项目，管成一个图标">
+    <meta property="og:description" content="开源、只在本机运行的网页桌面。一起启停、健康检查、一键安装、可回滚。Open source, local only.">
+    <title>Vibe Desktop — 把前后端分离的项目管成一个图标</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/desktop.css">
     <script src="/app.js" defer></script>
+    <script type="module" src="/desktop/main.js"></script>
   </head>
-  <body>
-    <a class="skip-link" href="#main">Skip to content</a>
-    <header class="site-header">
-      <a class="brand" href="/" aria-label="Vibe Desktop home">
-        <img src="/icon.svg" width="36" height="36" alt="">
+  <body class="vd" data-page="desktop">
+    <a class="skip-link" href="#vd-main">Skip to the desktop</a>
+    <canvas class="vd-wallpaper" aria-hidden="true"></canvas>
+    <div class="vd-grain" aria-hidden="true"></div>
+
+    <div class="vd-boot" aria-hidden="true">
+      <svg class="vd-boot-mark" viewBox="0 0 64 64">
+        <path d="M14 38c9.5-22 26.5-22 36 0" pathLength="1"/>
+        <circle cx="22" cy="39" r="5"/>
+        <circle cx="42" cy="39" r="5"/>
+      </svg>
+      <p>Vibe Desktop</p>
+    </div>
+
+    <header class="vd-topbar">
+      <button class="vd-brand" type="button" data-menu="brand" aria-haspopup="menu" aria-expanded="false">
+        <img src="/icon.svg" width="22" height="22" alt="">
         <span>Vibe Desktop</span>
-      </a>
-      <nav aria-label="Primary navigation">
-        <a href="/apps">Apps</a>
-        <a href="/developers">Developers</a>
-        <a href="#install">Install</a>
-        <a href="https://github.com/vimalinx/vibedesktop">GitHub</a>
+      </button>
+      <nav class="vd-menus" aria-label="Menus">
+        <button type="button" data-menu="apps" aria-haspopup="menu" aria-expanded="false" data-i18n="menu.apps">Apps</button>
+        <button type="button" data-menu="windows" aria-haspopup="menu" aria-expanded="false" data-i18n="menu.windows">Windows</button>
+        <button type="button" data-menu="scenes" aria-haspopup="menu" aria-expanded="false" data-i18n="menu.scenes">Scenes</button>
       </nav>
+      <span class="vd-topbar-spacer"></span>
+      <span class="vd-badge" tabindex="0" data-i18n="demo.badge" data-i18n-label="demo.tip">Web preview</span>
+      <button class="vd-top-btn vd-search-btn" type="button" data-action="search">
+        <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 17a6.5 6.5 0 100-13 6.5 6.5 0 000 13zM15.5 15.5L20 20"/></svg>
+        <span data-i18n="menu.search">Search</span>
+        <kbd data-search-key>Ctrl K</kbd>
+      </button>
+      <button class="vd-top-btn" type="button" data-action="wallpaper" data-i18n-label="menu.wallpaper">
+        <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 15.5l4.5-4.5 4 4 2.5-2.5 5 5"/></svg>
+      </button>
+      <button class="vd-top-btn vd-lang" type="button" data-action="lang" data-i18n="menu.lang" data-i18n-label="menu.langLabel">EN</button>
+      <time class="vd-clock"></time>
     </header>
 
-    <main id="main">
-      <section class="hero" aria-labelledby="hero-title">
-        <div class="hero-copy">
-          <p class="eyebrow"><span></span> Open source · Linux · 100% local</p>
-          <h1 id="hero-title">Every frontend + backend project.<br><em>One local desktop.</em></h1>
-          <p class="lede">Point Vibe Desktop at a project folder, or install an app from the market. It starts the frontend and backend together, checks they are healthy, and gives you one icon to open, stop, restart, and debug them.</p>
-          <p class="lede-zh" lang="zh-CN">把本机所有前后端分离的项目，放进同一个桌面里：一键安装、一起启停、健康检查、分服务看日志。</p>
-          <div class="hero-actions">
-            <a class="button primary" href="#install">Install Vibe Desktop</a>
-            <a class="button secondary" href="/apps">Browse apps</a>
-          </div>
-          <ul class="trust-list" aria-label="Project facts">
-            <li>Apache-2.0</li>
-            <li>Signed releases</li>
-            <li>No account</li>
-          </ul>
-        </div>
-
-        <div class="desktop-preview" aria-label="Illustration of the Vibe Desktop interface">
-          <div class="preview-bar">
-            <span class="preview-mark"></span>
-            <strong>Local WebApps</strong>
-            <span class="preview-time">2 running</span>
-          </div>
-          <div class="preview-grid" aria-hidden="true">
-            <span class="preview-app"><i>NA</i>Notes AI</span>
-            <span class="preview-app weather"><i>OK</i>Healthy</span>
-            <span class="preview-app"><i>WB</i>web :5173</span>
-            <span class="preview-app"><i>AP</i>api :8000</span>
-            <span class="preview-app"><i>LG</i>Logs</span>
-            <span class="preview-app"><i>+</i>Install</span>
-          </div>
-          <div class="preview-window" aria-hidden="true">
-            <span>INSTALL APP · COMMUNITY</span>
-            <strong>Review every command before it runs.</strong>
-            <div><b></b><b></b><b></b></div>
-          </div>
-          <div class="preview-dock" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-        </div>
-      </section>
-
-      <section class="facts" aria-label="At a glance">
-        <div><strong>1</strong><span>command to install</span></div>
-        <div><strong>~85 MB</strong><span>installed size</span></div>
-        <div><strong>0</strong><span>accounts or telemetry</span></div>
-        <div><strong>127.0.0.1</strong><span>everything stays local</span></div>
-      </section>
-
-      <section class="feature-section" id="features" aria-labelledby="features-title">
-        <div class="section-heading">
-          <p class="eyebrow">THE PROBLEM IT SOLVES</p>
-          <h2 id="features-title">No more terminals, ports, and half-running apps.</h2>
-          <p class="section-zh" lang="zh-CN">不用再开一堆终端、记一堆端口，也不会再出现「前端在跑、后端挂了」。</p>
-        </div>
-        <div class="feature-grid">
-          <article>
-            <span class="feature-number">01</span>
-            <h3>Import a folder, get an app</h3>
-            <p>Detects <code>web/</code> + <code>server/</code> style layouts and common frameworks, or follows the project's own <code>.vibedesktop/app.json</code>.</p>
-          </article>
-          <article>
-            <span class="feature-number">02</span>
-            <h3>Start and stop as one</h3>
-            <p>All services run in one supervised group. If one dies, the whole app restarts with back-off instead of half-running.</p>
-          </article>
-          <article>
-            <span class="feature-number">03</span>
-            <h3>Verified, reversible installs</h3>
-            <p>An install only counts once the page answers. A failed install or update is rolled back; your app data is kept.</p>
-          </article>
-          <article>
-            <span class="feature-number">04</span>
-            <h3>Nothing hidden</h3>
-            <p>Each app gets a readable <code>run.sh</code>, per-service logs, and live CPU and memory. Your source tree is never modified.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="market-teaser" aria-labelledby="market-title">
-        <div>
-          <p class="eyebrow">APP MARKET</p>
-          <h2 id="market-title">Install open-source apps with one click.</h2>
-          <p>Apps that ship <code>.vibedesktop/app.json</code> are listed automatically. Install opens Vibe Desktop on your machine and shows the exact commit, commands, and ports first.</p>
-          <p class="section-zh" lang="zh-CN">点「安装」会叫起你本机的 Vibe Desktop，先给你看清楚要运行的每一条命令，确认后才动手。</p>
-        </div>
-        <div class="teaser-actions">
-          <a class="button primary" href="/apps">Browse apps</a>
-          <a class="button secondary" href="/developers">List your app</a>
-        </div>
-      </section>
-
-      <section class="install-section" id="install" aria-labelledby="install-title">
-        <div>
-          <p class="eyebrow">LINUX · GIT · ONE COMMAND</p>
-          <h2 id="install-title">Install the whole desktop.</h2>
-          <p>The installer picks the first free port from 3000–3010, brings a pinned Node.js when needed, and creates user services. Then run <code>vibedesktop open</code>.</p>
-        </div>
-        <div class="command-card">
-          <div class="command-header"><span>Terminal</span><span>latest release</span></div>
-          <pre><code id="install-command">curl -fsSL https://github.com/vimalinx/vibedesktop/releases/latest/download/install-app.sh | sh</code></pre>
-          <button class="copy-button" type="button" data-copy-target="install-command">Copy command</button>
-          <p class="copy-status" role="status" aria-live="polite"></p>
-        </div>
-      </section>
-
-      <section class="boundary" aria-labelledby="boundary-title">
-        <p class="eyebrow">CLEAR SECURITY BOUNDARY</p>
-        <h2 id="boundary-title">A web page can only ask. Your desktop shows every command, and nothing runs until you confirm.</h2>
-        <a href="https://github.com/vimalinx/vibedesktop/blob/main/SECURITY.md">Read the security model <span aria-hidden="true">→</span></a>
-      </section>
+    <main id="vd-main" class="vd-desk">
+      <h1 class="visually-hidden">Vibe Desktop</h1>
+      <nav class="vd-icons" aria-label="Desktop"></nav>
+      <div class="vd-windows"></div>
     </main>
 
-    <footer>
-      <div class="brand footer-brand">
-        <img src="/icon.svg" width="32" height="32" alt="">
-        <span>Vibe Desktop</span>
+    <nav class="vd-dock" aria-label="Dock"></nav>
+    <p class="vd-toast" role="status" aria-live="polite"></p>
+
+    <noscript>
+      <div class="vd-noscript">
+        <h2>Vibe Desktop</h2>
+        <p>把本机所有前后端分离的项目，放进同一个桌面里：一起启动、一起停止、健康检查、分服务看日志。开源、只在本机运行。</p>
+        <p>Every frontend + backend project on your computer, as one desktop app: start and stop together, health checks, logs per service. Open source, local only.</p>
+        <pre><code>curl -fsSL https://github.com/vimalinx/vibedesktop/releases/latest/download/install-app.sh | sh</code></pre>
+        <p><a href="/apps">App market</a> · <a href="/developers">Developers</a> · <a href="https://github.com/vimalinx/vibedesktop">GitHub</a></p>
       </div>
-      <p>Local-first. Single-user. Open source.</p>
-      <div>
-        <a href="https://github.com/vimalinx/vibedesktop">Source</a>
-        <a href="https://github.com/vimalinx/vibedesktop/issues">Issues</a>
-        <a href="https://github.com/vimalinx/vibedesktop/blob/main/LICENSE">License</a>
-      </div>
-    </footer>
+    </noscript>
   </body>
 </html>
