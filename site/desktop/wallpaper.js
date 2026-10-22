@@ -2,8 +2,8 @@
    one canvas behind the desktop at ≤30 fps, and still when motion is reduced. */
 import { emit, makeNoise, mulberry32, reducedMotion, store } from "./util.js";
 
-export const MOODS = ["shanshui", "aurora", "stars", "riso"];
-const SCALE = { shanshui: 1, aurora: 0.25, stars: 1, riso: 0.5 };
+export const MOODS = ["shanshui", "bloom", "dune", "aurora", "stars", "riso"];
+const SCALE = { shanshui: 1, bloom: 0.5, dune: 0.5, aurora: 0.25, stars: 1, riso: 0.5 };
 
 let canvas = null;
 let ctx = null;
@@ -492,4 +492,94 @@ function riso(seedValue, W, H, s) {
   };
 }
 
-const MAKERS = { shanshui, aurora, stars, riso };
+/* ----- 花开 Bloom: translucent ribbons folding into a flower, for the Windows-style desktop ----- */
+
+function bloom(seedValue, W, H) {
+  const rand = mulberry32(seedValue);
+  const cx = W * (0.58 + rand() * 0.1);
+  const cy = H * (0.55 + rand() * 0.06);
+  const unit = Math.min(W, H);
+  const petals = Array.from({ length: 9 }, (_, i) => ({
+    angle: (i / 9) * Math.PI * 2 + rand() * 0.3,
+    length: unit * (0.42 + rand() * 0.22),
+    width: unit * (0.13 + rand() * 0.08),
+    hue: 205 + rand() * 30,
+    light: 48 + rand() * 22,
+    phase: rand() * 6.28
+  }));
+  return {
+    frame(c, w, h, t, p) {
+      const sky = c.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.9);
+      sky.addColorStop(0, "#1b3f8f");
+      sky.addColorStop(0.45, "#0c1c4a");
+      sky.addColorStop(1, "#050a1c");
+      c.globalCompositeOperation = "source-over";
+      c.fillStyle = sky;
+      c.fillRect(0, 0, w, h);
+      c.globalCompositeOperation = "screen";
+      const turn = (p.x - 0.5) * 0.25 + Math.sin(t * 0.00012) * 0.05;
+      for (const petal of petals) {
+        const breathe = 1 + Math.sin(t * 0.0005 + petal.phase) * 0.04;
+        c.save();
+        c.translate(cx, cy);
+        c.rotate(petal.angle + turn);
+        const length = petal.length * breathe;
+        const g = c.createLinearGradient(0, 0, length, 0);
+        g.addColorStop(0, `hsla(${petal.hue}, 90%, ${petal.light + 18}%, 0.75)`);
+        g.addColorStop(0.6, `hsla(${petal.hue}, 85%, ${petal.light}%, 0.35)`);
+        g.addColorStop(1, `hsla(${petal.hue + 10}, 80%, 40%, 0)`);
+        c.fillStyle = g;
+        c.beginPath();
+        c.moveTo(0, 0);
+        c.bezierCurveTo(length * 0.3, -petal.width, length * 0.8, -petal.width * 0.8, length, 0);
+        c.bezierCurveTo(length * 0.75, petal.width * 0.35, length * 0.3, petal.width * 0.5, 0, 0);
+        c.fill();
+        c.restore();
+      }
+      const core = c.createRadialGradient(cx, cy, 0, cx, cy, unit * 0.12);
+      core.addColorStop(0, "rgba(220, 238, 255, 0.55)");
+      core.addColorStop(1, "rgba(220, 238, 255, 0)");
+      c.fillStyle = core;
+      c.fillRect(0, 0, w, h);
+      c.globalCompositeOperation = "source-over";
+    }
+  };
+}
+
+/* ----- 沙丘 Dunes: layered dusk waves, for the macOS-style desktop ----- */
+
+function dune(seedValue) {
+  const rand = mulberry32(seedValue);
+  const noise = makeNoise(seedValue + 3);
+  const colors = [["#3b2a6b", "#2a1f52"], ["#6b3a7a", "#4a2a63"], ["#b2507a", "#7a3466"], ["#e0795e", "#a8475f"], ["#f2a65a", "#c8664f"], ["#1e1638", "#120d24"]];
+  const layers = colors.map(([top, bottom], i) => ({ top, bottom, base: 0.3 + i * 0.12, amp: 0.05 + rand() * 0.05, f: 1.2 + rand() * 1.4, k: rand() * 100, v: 0.00004 + rand() * 0.00006 }));
+  return {
+    frame(c, w, h, t, p) {
+      const sky = c.createLinearGradient(0, 0, 0, h);
+      sky.addColorStop(0, "#140f2b");
+      sky.addColorStop(0.5, "#3a2556");
+      sky.addColorStop(1, "#7a3d5e");
+      c.fillStyle = sky;
+      c.fillRect(0, 0, w, h);
+      layers.forEach((layer, i) => {
+        const shift = (p.x - 0.5) * (i + 1) * 6;
+        const g = c.createLinearGradient(0, h * (layer.base - layer.amp), 0, h);
+        g.addColorStop(0, layer.top);
+        g.addColorStop(1, layer.bottom);
+        c.fillStyle = g;
+        c.beginPath();
+        c.moveTo(0, h);
+        for (let x = 0; x <= w; x += 4) {
+          const u = (x + shift) / w;
+          const y = h * (layer.base + Math.sin(u * Math.PI * layer.f + layer.k + t * layer.v) * layer.amp + noise(u * 2 + layer.k, t * 0.00003) * layer.amp * 0.6);
+          c.lineTo(x, y);
+        }
+        c.lineTo(w, h);
+        c.closePath();
+        c.fill();
+      });
+    }
+  };
+}
+
+const MAKERS = { shanshui, bloom, dune, aurora, stars, riso };

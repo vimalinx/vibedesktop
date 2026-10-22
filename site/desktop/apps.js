@@ -1,11 +1,14 @@
 /* The apps on this desktop: built-ins, toys, and websites that allow being
    framed. Each app mounts into a window body and may return a controller. */
-import { copyText, emit, glyph, h, isCompact, store, tile } from "./util.js";
+import { INSTALL_COMMAND, copyText, emit, glyph, h, isCompact, store, tile } from "./util.js";
 import { lang, pick, t } from "./i18n.js";
-import { INSTALL_COMMAND } from "./chapters.js";
-import { mountInk } from "./ink.js";
+import { mountCatcher } from "./catcher.js";
 import { mountGarden } from "./garden.js";
-import { mountTutorial } from "./tutorial.js";
+import { mountInk } from "./ink.js";
+import { petEnabled, setPetEnabled } from "./pet.js";
+import { mountPoem } from "./poem.js";
+import { mountShowcase } from "./showcase.js";
+import { STYLES, applyStyle, currentStyle, styleCard } from "./styles.js";
 import { MOODS, getWallpaper, paintPreview, setAnimated, setWallpaper } from "./wallpaper.js";
 
 /* Every site below was checked to render inside a frame (no X-Frame-Options,
@@ -48,12 +51,14 @@ export function buildRegistry(ctx) {
   const apps = new Map();
   const add = (app) => apps.set(app.id, { single: true, tileNode: () => tile(app.glyph, app.tint), ...app, title: app.title || (() => t(`app.${app.id}`)) });
   add({ id: "welcome", glyph: "sparkle", tint: "acid", size: [660, 600], mount: (body) => mountWelcome(body, ctx) });
-  add({ id: "tutorial", glyph: "star", tint: "gold", size: [1080, 720], offset: 40, mount: (body, win) => mountTutorial(body, { ...ctx, params: win.params }) });
+  add({ id: "showcase", glyph: "star", tint: "gold", size: [1000, 720], offset: 40, mount: (body, win) => mountShowcase(body, { ...ctx, params: win.params }) });
   add({ id: "market", glyph: "bag", tint: "blue", size: [1040, 720], mount: embedPage("/apps", t("app.market")) });
   add({ id: "install", glyph: "download", tint: "lime", size: [780, 680], mount: (body) => mountInstall(body) });
   add({ id: "ink", glyph: "brush", tint: "paper", size: [880, 620], mount: (body) => mountInk(body) });
   add({ id: "garden", glyph: "flower", tint: "night", size: [620, 700], mount: (body) => mountGarden(body) });
-  add({ id: "wallpaper", glyph: "image", tint: "aurora", size: [820, 620], mount: (body) => mountWallpaperStudio(body) });
+  add({ id: "appearance", glyph: "image", tint: "aurora", size: [860, 680], mount: (body) => mountAppearance(body, ctx) });
+  add({ id: "poem", glyph: "scroll", tint: "paper", size: [820, 640], mount: (body) => mountPoem(body) });
+  add({ id: "catcher", glyph: "keys", tint: "coral", size: [640, 680], mount: (body) => mountCatcher(body) });
   add({ id: "gallery", glyph: "grid", tint: "coral", size: [980, 700], mount: (body) => mountGallery(body, ctx) });
   add({ id: "browser", glyph: "globe", tint: "teal", size: [1040, 700], mount: (body, win) => mountBrowser(body, win) });
   add({ id: "developers", glyph: "code", tint: "violet", size: [1000, 720], mount: embedPage("/developers", t("app.developers")) });
@@ -108,7 +113,8 @@ function mountSite(body, url, title) {
 
 function mountWelcome(body, ctx) {
   const title = h("h3", { class: "welcome-title" }, t("welcome.title").split("\n").map((line, index) => (index ? [h("br"), h("em", { text: line })] : line)));
-  const start = h("button", { type: "button", class: "button primary", onClick: () => ctx.openApp("tutorial") }, glyph("star"), t("welcome.start"));
+  const first = h("button", { type: "button", class: "button primary", onClick: () => ctx.openApp("showcase") }, glyph("star"), t("welcome.showcase"));
+  const fun = [["welcome.fun1", null], ["welcome.fun2", "poem"], ["welcome.fun3", "catcher"]];
   body.append(h("div", { class: "welcome" },
     h("div", { class: "welcome-art", "aria-hidden": "true" }, h("span", { class: "welcome-arc" }), h("span", { class: "welcome-dot dot-gold" }), h("span", { class: "welcome-dot dot-blue" })),
     h("p", { class: "eyebrow welcome-kicker" }, h("span"), t("welcome.kicker")),
@@ -117,11 +123,12 @@ function mountWelcome(body, ctx) {
     h("p", { class: "welcome-demo", text: t("welcome.demo") }),
     isCompact() ? h("p", { class: "welcome-mobile", text: t("welcome.mobile") }) : null,
     h("div", { class: "welcome-actions" },
-      start,
+      first,
       h("button", { type: "button", class: "button secondary", onClick: () => ctx.openApp("install") }, glyph("download"), t("welcome.install")),
-      h("button", { type: "button", class: "button ghost", onClick: () => ctx.closeApp("welcome") }, t("welcome.explore"))),
-    h("ul", { class: "welcome-tips" }, ["welcome.tip1", "welcome.tip2", "welcome.tip3"].map((key) => h("li", { text: t(key) })))));
-  requestAnimationFrame(() => start.focus({ preventScroll: true }));
+      h("button", { type: "button", class: "button ghost", onClick: () => ctx.closeApp("welcome") }, t("welcome.play"))),
+    h("ul", { class: "welcome-tips" }, fun.map(([key, app]) => h("li", {},
+      h("button", { type: "button", class: "link-button", onClick: () => (app ? ctx.openApp(app) : emit("pet:poke", {})) }, t(key)))))));
+  requestAnimationFrame(() => first.focus({ preventScroll: true }));
   return {};
 }
 
@@ -246,32 +253,43 @@ function mountBrowser(body, win) {
   };
 }
 
-/* ----- Wallpaper Studio ----- */
+/* ----- Appearance: desktop style, wallpaper, pet ----- */
 
-function mountWallpaperStudio(body) {
+function mountAppearance(body, ctx) {
+  const styles = h("div", { class: "style-grid", role: "radiogroup", "aria-label": t("appearance.style") });
   const grid = h("div", { class: "wallpaper-grid" });
   const animate = h("input", { type: "checkbox" });
+  const pet = h("input", { type: "checkbox" });
+  const renderStyles = () => styles.replaceChildren(...STYLES.map((style) => styleCard(style, style.id === currentStyle(), (id) => applyStyle(id))));
   const render = () => {
     const { mood, seed, animated } = getWallpaper();
     animate.checked = animated;
+    pet.checked = petEnabled();
     grid.replaceChildren(...MOODS.map((name) => {
       const preview = h("canvas", { width: "320", height: "200", class: "wallpaper-preview", "aria-hidden": "true" });
       paintPreview(preview, name, seed);
-      const labelKey = `wallpaper.${name}`;
-      return h("button", { type: "button", class: "wallpaper-card", "aria-pressed": String(name === mood), onClick: () => { setWallpaper(name); setTimeout(render, 320); } },
+      return h("button", { type: "button", class: "wallpaper-card", "aria-pressed": String(name === mood), onClick: () => setWallpaper(name) },
         preview,
-        h("strong", { text: t(labelKey) }),
-        h("small", { text: t(`${labelKey}.note`) }),
+        h("strong", { text: t(`wallpaper.${name}`) }),
+        h("small", { text: t(`wallpaper.${name}.note`) }),
         name === mood ? h("span", { class: "wallpaper-current", text: t("wallpaper.current") }) : null);
     }));
   };
   animate.addEventListener("change", () => setAnimated(animate.checked));
+  pet.addEventListener("change", () => setPetEnabled(pet.checked));
   body.append(h("div", { class: "wallpaper-studio" },
-    h("p", { class: "gallery-lead", text: t("wallpaper.lead") }),
+    h("h3", { class: "gallery-heading", text: t("appearance.style") }),
+    styles,
+    h("h3", { class: "gallery-heading", text: t("appearance.wallpaper") }),
+    h("p", { class: "gallery-lead", text: t("appearance.wallpaperLead") }),
     grid,
     h("div", { class: "sim-controls" },
-      h("button", { type: "button", class: "button primary", onClick: () => { const { mood } = getWallpaper(); setWallpaper(mood, Math.floor(Math.random() * 1e6)); setTimeout(render, 320); } }, glyph("sparkle"), t("wallpaper.seed")),
-      h("label", { class: "toggle" }, animate, h("span", { text: t("wallpaper.animate") })))));
+      h("button", { type: "button", class: "button primary", onClick: () => { const { mood } = getWallpaper(); setWallpaper(mood, Math.floor(Math.random() * 1e6)); } }, glyph("sparkle"), t("wallpaper.seed")),
+      h("label", { class: "toggle" }, animate, h("span", { text: t("wallpaper.animate") })),
+      h("label", { class: "toggle" }, pet, h("span", { text: t("appearance.pet") })))));
+  renderStyles();
   render();
-  return {};
+  const offStyle = ctx.on("style:change", renderStyles);
+  const offWall = ctx.on("wallpaper:change", () => setTimeout(render, 320));
+  return { unmount: () => { offStyle(); offWall(); } };
 }

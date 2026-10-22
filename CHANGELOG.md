@@ -3,6 +3,26 @@
 All notable user-visible changes are documented here. Vibe Desktop follows
 semantic versioning from the first public 0.2 release onward.
 
+## 0.3.2 - 2026-10-22
+
+The desktop itself is unchanged; this release publishes the redesigned website
+and the deploy script that purges its cache.
+
+### vibedesktop.online
+- First visit starts by picking a desktop: Vibe Ink, a Windows 11 style (centered
+  taskbar, Start menu) or a macOS style (menu bar, magnifying Dock, traffic-light
+  buttons), each with its own generative wallpaper. Switch any time in Appearance.
+- The Star Guide is replaced by **What it does**: four short pages with the
+  hands-on simulations (one icon per project, market install, app.json bug hunt,
+  security boundary) and no missions.
+- New toys: Little V, a desktop pet that wanders, naps, can be thrown and rides on
+  windows; Poem Lots, classical couplets with a developer's do/avoid reading; and
+  Port Catcher, a game about pairing frontends with backends.
+
+### Tooling
+- `npm run site:deploy` builds, uploads, purges the domain's edge cache and checks
+  the live scripts and styles match, so a deploy is never half old, half new.
+
 ## 0.3.1 - 2026-10-22
 
 The desktop itself is unchanged; this release publishes the new website.

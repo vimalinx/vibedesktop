@@ -14,7 +14,7 @@ checks they are healthy, and gives you one icon to open, stop, restart, and debu
 ![Node.js 20+](https://img.shields.io/badge/node-%E2%89%A520-339933)
 ![Local only](https://img.shields.io/badge/runs-100%25%20local-success)
 
-**[Try the web preview →](https://vibedesktop.online)** — a playable desktop with an interactive guide.
+**[Try the web preview →](https://vibedesktop.online)** — pick a Vibe, Windows 11 or macOS style desktop and play.
 
 English · [简体中文](README.zh-CN.md)
 

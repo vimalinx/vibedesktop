@@ -3,23 +3,27 @@
 import { emit, glyph, h, on, reducedMotion, store } from "./util.js";
 import { lang, pick, setLang, t } from "./i18n.js";
 import { SITES, buildRegistry, pinSite, pinnedSites } from "./apps.js";
-import { CHAPTERS } from "./chapters.js";
-import { initTour } from "./tutorial.js";
+import { initPet } from "./pet.js";
+import { SECTIONS } from "./showcase.js";
+import { STYLES, applyStyle, currentStyle, savedStyle, styleCard } from "./styles.js";
 import { MOODS, nextWallpaper, setWallpaper, startWallpaper } from "./wallpaper.js";
 import * as wm from "./wm.js";
 
 const $ = (selector) => document.querySelector(selector);
 
-const DESKTOP = ["tutorial", "market", "install", "ink", "garden", "wallpaper", "gallery", "browser", "developers", "github"];
-const DOCK = ["tutorial", "market", "ink", "garden", "gallery", "browser", "install"];
+const DESKTOP = ["showcase", "market", "install", "appearance", "ink", "garden", "poem", "catcher", "gallery", "browser", "developers", "github"];
+const DOCK = ["showcase", "market", "ink", "poem", "catcher", "gallery", "browser", "install"];
+const MENU_APPS = ["showcase", "market", "install", "appearance", "ink", "garden", "poem", "catcher", "gallery", "browser", "developers"];
 const KEYWORDS = {
   welcome: "welcome about 欢迎 关于 vibe",
-  tutorial: "star guide tutorial help 星图 教程 帮助 新手",
+  showcase: "what it does demo features import market 它能做什么 演示 功能 导入",
+  appearance: "appearance style theme wallpaper windows macos 外观 样式 主题 壁纸",
+  poem: "poem lot fortune 诗签 抽签 古诗",
+  catcher: "game port catcher play 端口接接乐 游戏",
   market: "app market store install apps 应用市场 商店 安装",
   install: "install download setup linux 安装 下载 命令",
   ink: "ink paint draw brush 墨染 画画 水墨 绘画",
   garden: "sound garden music 声之花园 音乐 声音",
-  wallpaper: "wallpaper background theme 壁纸 背景",
   gallery: "web gallery sites 网页画廊 网站",
   browser: "browser url website 浏览器 网址",
   developers: "developers app.json author skill 开发者 作者 上架",
@@ -162,11 +166,16 @@ function renderDock() {
   const windows = wm.listWindows();
   const running = new Set(windows.map((win) => win.appId));
   const extra = [...running].filter((id) => !DOCK.includes(id));
-  const key = [...DOCK, "|", ...extra].join(",");
+  const style = currentStyle();
+  const key = [style, ...DOCK, "|", ...extra].join(",");
   if (key !== dockKey) {
     dockKey = key;
     const separator = extra.length ? [h("span", { class: "vd-dock-sep", "aria-hidden": "true" })] : [];
-    dock.replaceChildren(...DOCK.map(dockButton), ...separator, ...extra.map(dockButton));
+    const lead = style === "win" ? [
+      h("button", { type: "button", class: "vd-dock-item vd-start-btn", "aria-label": t("start.label"), title: t("start.label"), "aria-haspopup": "dialog", onClick: (event) => toggleStart(event.currentTarget) }, h("img", { src: "/icon.svg", width: "30", height: "30", alt: "" })),
+      h("button", { type: "button", class: "vd-dock-item vd-taskbar-search", "aria-label": t("menu.search"), title: t("menu.search"), onClick: openSearch }, glyph("search"))
+    ] : [];
+    dock.replaceChildren(...lead, ...DOCK.map(dockButton), ...separator, ...extra.map(dockButton));
   }
   const active = wm.activeWindow()?.appId;
   for (const button of dock.querySelectorAll("[data-app]")) {
@@ -232,8 +241,9 @@ function openMenu(anchor, items, point) {
   document.body.append(menu);
   const rect = anchor.getBoundingClientRect();
   const box = menu.getBoundingClientRect();
-  const x = point ? point.x : rect.left;
-  const y = point ? point.y : rect.bottom + 6;
+  const hiddenAnchor = !point && rect.width === 0 && rect.height === 0;
+  const x = point ? point.x : hiddenAnchor ? (innerWidth - box.width) / 2 : rect.left;
+  const y = point ? point.y : hiddenAnchor ? innerHeight - wm.getInsets().bottom - box.height - 8 : rect.bottom + 6;
   menu.style.left = `${Math.max(8, Math.min(x, innerWidth - box.width - 8))}px`;
   menu.style.top = `${Math.max(8, Math.min(y, innerHeight - box.height - 8))}px`;
   anchor.setAttribute("aria-expanded", "true");
@@ -256,9 +266,8 @@ function openMenu(anchor, items, point) {
 }
 
 function appsMenu(anchor) {
-  const ids = ["tutorial", "market", "install", "ink", "garden", "wallpaper", "gallery", "browser", "developers"];
   openMenu(anchor, [
-    ...ids.map((id) => ({ glyph: registry.get(id).glyph, label: registry.get(id).title(), run: () => launch(id) })),
+    ...MENU_APPS.map((id) => ({ glyph: registry.get(id).glyph, label: registry.get(id).title(), run: () => launch(id) })),
     "sep",
     { glyph: "branch", label: "GitHub", hint: "↗", run: () => launch("github") },
     { glyph: "info", label: t("menu.about"), run: () => launch("welcome") }
@@ -302,7 +311,8 @@ function scenesMenu(anchor) {
 function brandMenu(anchor) {
   openMenu(anchor, [
     { glyph: "info", label: t("menu.about"), run: () => launch("welcome") },
-    { glyph: "star", label: t("app.tutorial"), run: () => launch("tutorial") },
+    { glyph: "star", label: t("app.showcase"), run: () => launch("showcase") },
+    { glyph: "image", label: t("app.appearance"), run: () => launch("appearance") },
     { glyph: "download", label: t("app.install"), run: () => launch("install") },
     "sep",
     { glyph: "branch", label: "GitHub", hint: "↗", run: () => launch("github") }
@@ -314,16 +324,20 @@ function brandMenu(anchor) {
 let search = null;
 
 function searchItems() {
-  const apps = ["tutorial", "market", "install", "ink", "garden", "wallpaper", "gallery", "browser", "developers", "github", "welcome"].map((id) => ({
+  const apps = [...MENU_APPS, "github", "welcome"].map((id) => ({
     kind: t("search.app"), label: registry.get(id).title(), node: () => registry.get(id).tileNode(), keys: KEYWORDS[id] || "", run: () => launch(id)
   }));
   const sites = SITES.map((site) => ({
     kind: t("search.site"), label: pick(site.name), node: () => registry.get(`site:${site.key}`).tileNode(),
     keys: `${site.name.zh} ${site.name.en} ${site.blurb.zh} ${site.blurb.en} ${new URL(site.url).hostname}`, run: () => launch(`site:${site.key}`)
   }));
-  const chapters = CHAPTERS.map((chapter, index) => ({
-    kind: t("search.chapter"), label: `${index + 1}. ${pick(chapter.short)} · ${pick(chapter.title)}`, node: () => registry.get("tutorial").tileNode(),
-    keys: `${chapter.short.zh} ${chapter.short.en} ${chapter.title.zh} ${chapter.title.en}`, run: () => launch("tutorial", { params: { chapter: chapter.id } })
+  const sections = SECTIONS.map((section) => ({
+    kind: t("app.showcase"), label: `${pick(section.tab)} · ${pick(section.title)}`, node: () => registry.get("showcase").tileNode(),
+    keys: `${section.tab.zh} ${section.tab.en} ${section.title.zh} ${section.title.en}`, run: () => launch("showcase", { params: { section: section.id } })
+  }));
+  const styles = STYLES.map((style) => ({
+    kind: t("search.command"), label: `${t("appearance.style")}：${pick(style.name)}`, node: () => registry.get("appearance").tileNode(),
+    keys: `style 样式 ${style.name.zh} ${style.name.en}`, run: () => applyStyle(style.id)
   }));
   const commands = [
     { kind: t("search.command"), label: t("command.tile"), keys: "tile split 平铺 分屏", run: () => wm.tileAll() },
@@ -331,7 +345,7 @@ function searchItems() {
     ...MOODS.map((mood) => ({ kind: t("search.command"), label: t("command.wallpaper", { name: t(`wallpaper.${mood}`) }), keys: `wallpaper 壁纸 ${mood}`, run: () => setWallpaper(mood) })),
     { kind: t("search.command"), label: t("command.lang"), keys: "language english chinese 语言 中文 英文", run: () => setLang(lang === "zh" ? "en" : "zh") }
   ];
-  return [...apps, ...chapters, ...sites, ...commands];
+  return [...apps, ...sections, ...sites, ...styles, ...commands];
 }
 
 function openSearch() {
@@ -427,13 +441,102 @@ $("[data-action=lang]").addEventListener("click", () => setLang(lang === "zh" ? 
 $("[data-search-key]").textContent = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "⌘K" : "Ctrl K";
 
 const clock = $(".vd-clock");
+const tray = h("div", { class: "vd-tray" },
+  h("button", { type: "button", class: "vd-tray-btn", text: t("menu.lang"), "aria-label": t("menu.langLabel"), title: t("menu.langLabel"), onClick: () => setLang(lang === "zh" ? "en" : "zh") }),
+  h("button", { type: "button", class: "vd-tray-btn", "aria-label": t("menu.wallpaper"), title: t("menu.wallpaper"), onClick: () => $("[data-action=wallpaper]").click() }, glyph("image")),
+  h("time", { class: "vd-tray-clock" }));
+document.body.append(tray);
 function tickClock() {
   const now = new Date();
+  const locale = lang === "zh" ? "zh-CN" : "en";
   clock.dateTime = now.toISOString();
-  clock.textContent = now.toLocaleString(lang === "zh" ? "zh-CN" : "en", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  clock.textContent = now.toLocaleString(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const trayClock = tray.querySelector("time");
+  trayClock.dateTime = now.toISOString();
+  trayClock.replaceChildren(h("span", { text: now.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }) }), h("span", { text: now.toLocaleDateString(locale) }));
 }
 tickClock();
 setInterval(tickClock, 20000);
+
+/* ----- Start menu (Windows style) ----- */
+
+let startPanel = null;
+
+function closeStart() {
+  startPanel?.remove();
+  startPanel = null;
+  removeEventListener("pointerdown", outsideStart, true);
+}
+
+function outsideStart(event) {
+  if (startPanel && !startPanel.contains(event.target) && !event.target.closest?.(".vd-start-btn")) closeStart();
+}
+
+function toggleStart() {
+  if (startPanel) {
+    closeStart();
+    return;
+  }
+  closeMenu();
+  const run = (fn) => () => {
+    closeStart();
+    fn();
+  };
+  const pinned = MENU_APPS.map((id) => h("button", { type: "button", class: "vd-start-app", onClick: run(() => launch(id)) }, registry.get(id).tileNode(), h("span", { text: registry.get(id).title() })));
+  const sceneList = scenes.list();
+  startPanel = h("div", { class: "vd-start", role: "dialog", "aria-label": t("start.label") },
+    h("button", { type: "button", class: "vd-start-search", onClick: run(openSearch) }, glyph("search"), h("span", { text: t("start.search") })),
+    h("p", { class: "vd-start-heading", text: t("start.pinned") }),
+    h("div", { class: "vd-start-grid" }, pinned),
+    h("p", { class: "vd-start-heading", text: t("start.scenes") }),
+    h("div", { class: "vd-start-scenes" },
+      sceneList.length
+        ? sceneList.map((scene) => h("button", { type: "button", class: "chip", onClick: run(() => scenes.restore(scene.name)) }, glyph("layers"), scene.name))
+        : h("p", { class: "vd-menu-empty", text: t("start.noScenes") }),
+      h("button", { type: "button", class: "chip", onClick: run(() => scenes.save()) }, glyph("save"), t("command.saveScene"))),
+    h("div", { class: "vd-start-foot" },
+      h("span", { class: "vd-start-user" }, h("img", { src: "/icon.svg", width: "28", height: "28", alt: "" }), h("span", { text: `Vibe Desktop · ${t("demo.badge")}` })),
+      h("button", { type: "button", class: "vd-start-power", onClick: run(() => launch("appearance")), title: t("start.appearance"), "aria-label": t("start.appearance") }, glyph("image")),
+      h("button", { type: "button", class: "vd-start-power", onClick: run(() => launch("github")), title: "GitHub", "aria-label": "GitHub" }, glyph("branch"))));
+  startPanel.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeStart();
+      dock.querySelector(".vd-start-btn")?.focus();
+    }
+  });
+  document.body.append(startPanel);
+  addEventListener("pointerdown", outsideStart, true);
+  startPanel.querySelector("button")?.focus();
+}
+
+/* ----- First visit: pick a desktop ----- */
+
+function onboard() {
+  let choice = currentStyle();
+  const cards = h("div", { class: "style-grid", role: "radiogroup", "aria-label": t("appearance.style") });
+  const renderCards = () => cards.replaceChildren(...STYLES.map((style) => styleCard(style, style.id === choice, (id) => {
+    choice = id;
+    applyStyle(id, { persist: false });
+    renderCards();
+  })));
+  renderCards();
+  const go = h("button", { type: "button", class: "button primary" }, t("onboard.go"), " →");
+  const panel = h("div", { class: "vd-onboard", role: "dialog", "aria-modal": "true", "aria-labelledby": "vd-onboard-title" },
+    h("div", { class: "vd-onboard-card" },
+      h("p", { class: "eyebrow" }, h("span"), "VIBE DESKTOP"),
+      h("h2", { class: "vd-onboard-title", id: "vd-onboard-title", text: t("onboard.title") }),
+      h("p", { class: "vd-onboard-lead", text: t("onboard.lead") }),
+      cards,
+      h("div", { class: "vd-onboard-actions" }, go, h("small", { text: t("onboard.later") }))));
+  go.addEventListener("click", () => {
+    applyStyle(choice);
+    panel.classList.add("is-leaving");
+    setTimeout(() => panel.remove(), reducedMotion.matches ? 0 : 420);
+    launch("welcome");
+  });
+  document.body.append(panel);
+  requestAnimationFrame(() => cards.querySelector("[aria-checked=true]")?.focus({ preventScroll: true }));
+}
 
 addEventListener("keydown", (event) => {
   const mod = event.ctrlKey || event.metaKey;
@@ -472,16 +575,23 @@ addEventListener("message", (event) => {
 
 startWallpaper($(".vd-wallpaper"));
 wm.initWindows(registry, $(".vd-windows"), renderDock);
-initTour(toast);
+const firstVisit = savedStyle() === null;
+applyStyle(savedStyle() || "vibe", { withWallpaper: false, persist: false });
 renderIcons();
 renderDock();
+initPet();
 on("desktop:changed", renderIcons);
+on("style:change", () => {
+  closeStart();
+  renderDock();
+});
 
 const params = new URLSearchParams(location.search);
 const restored = params.has("safe") ? false : wm.restoreLayout();
-const ROUTES = { install: "install", tutorial: "tutorial", guide: "tutorial", market: "market", apps: "market", developers: "developers", welcome: "welcome" };
+const ROUTES = { install: "install", showcase: "showcase", market: "market", apps: "market", developers: "developers", appearance: "appearance", poem: "poem", catcher: "catcher", welcome: "welcome" };
 const route = ROUTES[params.get("open") || location.hash.slice(1)];
-if (route) launch(route, params.get("chapter") ? { params: { chapter: params.get("chapter") } } : undefined);
+if (route) launch(route, params.get("section") ? { params: { section: params.get("section") } } : undefined);
+else if (firstVisit) onboard();
 else if (!restored) launch("welcome");
 if (location.hash || params.has("open")) history.replaceState(null, "", location.pathname);
 

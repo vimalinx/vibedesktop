@@ -1,6 +1,6 @@
 {
   "name": "vibedesktop",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "A local-only, single-user web desktop, fully open source under Apache-2.0.",
   "license": "Apache-2.0",
   "author": "Vimalinx",
@@ -41,6 +41,7 @@
     "release:verify": "node scripts/verify-release.mjs",
     "catalog:icons": "tsx scripts/sync-catalog-icons.ts",
     "catalog:build": "tsx scripts/build-catalog.ts",
+    "site:deploy": "node scripts/deploy-site.mjs --build",
     "catalog:stage": "node scripts/stage-catalog.mjs",
     "lint:css-literals": "node scripts/check-css-literals.mjs --report",
     "lint:contrast": "node scripts/check-contrast.mjs --report",

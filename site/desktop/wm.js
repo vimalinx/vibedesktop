@@ -4,8 +4,6 @@
 import { clamp, emit, glyph, h, isCompact, reducedMotion, store } from "./util.js";
 import { t } from "./i18n.js";
 
-const TOP = 44;
-const BOTTOM = 92;
 const EDGE = 8;
 const MIN_W = 320;
 const MIN_H = 220;
@@ -19,6 +17,7 @@ let seq = 0;
 let activeId = null;
 let saveTimer = 0;
 let onChange = () => {};
+let insets = { top: 44, bottom: 92 };
 
 export function initWindows(apps, container, changed) {
   registry = apps;
@@ -34,8 +33,19 @@ export function initWindows(apps, container, changed) {
   });
 }
 
+/** The desktop style decides where the top bar and the dock or taskbar sit. */
+export function setInsets(next) {
+  insets = { ...next };
+  for (const win of wins.values()) {
+    fitInside(win);
+    apply(win);
+  }
+}
+
+export const getInsets = () => ({ ...insets });
+
 export function area() {
-  return { x: 0, y: TOP, w: innerWidth, h: Math.max(240, innerHeight - TOP - BOTTOM) };
+  return { x: 0, y: insets.top, w: innerWidth, h: Math.max(240, innerHeight - insets.top - insets.bottom) };
 }
 
 function shown(win) {
@@ -110,9 +120,10 @@ export function openApp(appId, options = {}) {
   };
 
   const title = h("h2", { class: "vd-win-title", id: `${id}-title`, text: app.title() });
+  const extra = h("div", { class: "vd-win-extra" });
   const actions = h("div", { class: "vd-win-actions" });
   const button = (act, name, label) => h("button", { type: "button", class: "vd-win-btn", "data-act": act, "aria-label": label, title: label }, glyph(name));
-  const bar = h("header", { class: "vd-win-bar" }, app.tileNode(), title, actions);
+  const bar = h("header", { class: "vd-win-bar" }, actions, app.tileNode(), title, extra);
   const body = h("div", { class: "vd-win-body" });
   const el = h("section", { class: `vd-win app-${app.id.replace(/[^a-z0-9-]/gi, "-")}`, role: "dialog", "aria-labelledby": title.id, tabindex: "-1", "data-win": id },
     bar, body, h("div", { class: "vd-win-resize", "aria-hidden": "true" }));
@@ -129,7 +140,7 @@ export function openApp(appId, options = {}) {
   }) || {};
   for (const extra of win.ctrl.actions || []) {
     const node = h("button", { type: "button", class: "vd-win-btn", "aria-label": extra.label, title: extra.label, onClick: extra.run }, glyph(extra.glyph));
-    actions.append(node);
+    extra.append(node);
   }
   actions.append(button("min", "minimize", t("win.minimize")), button("max", "maximize", t("win.maximize")), button("close", "close", t("win.close")));
   actions.addEventListener("click", (event) => {
@@ -312,13 +323,13 @@ function enableDrag(win, bar) {
           win.maximized = false;
           win.snapped = null;
           win.rect.x = start.x - win.rect.w * ratio;
-          win.rect.y = Math.max(TOP, start.y - 20);
+          win.rect.y = Math.max(insets.top, start.y - 20);
           start.rect = { ...win.rect };
         }
       }
       win.rect.x = start.rect.x + dx;
-      win.rect.y = clamp(start.rect.y + dy, TOP, innerHeight - 60);
-      zone = moveEvent.clientX <= EDGE ? "left" : moveEvent.clientX >= innerWidth - EDGE ? "right" : moveEvent.clientY <= TOP - 6 ? "max" : null;
+      win.rect.y = clamp(start.rect.y + dy, insets.top, innerHeight - 60);
+      zone = moveEvent.clientX <= EDGE ? "left" : moveEvent.clientX >= innerWidth - EDGE ? "right" : moveEvent.clientY <= Math.max(2, insets.top - 6) ? "max" : null;
       showGhost(zone);
       apply(win);
     };

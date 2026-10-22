@@ -98,3 +98,18 @@ free loopback port through 3010 and persists it in the CLI and systemd unit.
 Use `sh -s -- --port 3002` when the deployment requires a fixed port.
 
 Confirm that a single click opens an app inside Vibe Desktop, a double click opens a browser tab, and an Agent can invoke `add-app` to plan, install, start, and health-check a local WebUI. Publication is not complete until this post-release smoke test passes against the actual GitHub asset URLs.
+
+## Deploy vibedesktop.online
+
+The site is static and deploys separately from releases:
+
+```bash
+npm run site:deploy   # build the site and market, upload to Cloudflare Pages, purge, verify
+```
+
+The custom domain caches assets at the edge for hours, so `scripts/deploy-site.mjs`
+purges the zone after every upload and then fetches the live scripts and stylesheets until
+they match the deploy; it fails instead of leaving a mix of old and new files. It reads
+Cloudflare credentials from the environment only (see the header of the script). The
+**Market and site** workflow runs the same script every six hours once the repository has
+the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets.

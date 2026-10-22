@@ -14,7 +14,7 @@
 ![Node.js 20+](https://img.shields.io/badge/node-%E2%89%A520-339933)
 ![Local only](https://img.shields.io/badge/runs-100%25%20local-success)
 
-**[在线体验 →](https://vibedesktop.online)**：一个能直接上手玩的网页桌面，附带互动教程。
+**[在线体验 →](https://vibedesktop.online)**：选一个 Vibe、Windows 11 或 macOS 风格的网页桌面，直接上手玩。
 
 [English](README.md) · 简体中文
 

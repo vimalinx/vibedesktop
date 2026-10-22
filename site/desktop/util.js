@@ -1,6 +1,8 @@
 /* Shared helpers for the vibedesktop.online web desktop. Everything renders
    through h()/textContent; no string ever becomes HTML. */
 
+export const INSTALL_COMMAND = "curl -fsSL https://github.com/vimalinx/vibedesktop/releases/latest/download/install-app.sh | sh";
+
 export const bus = new EventTarget();
 
 export function emit(type, detail = {}) {

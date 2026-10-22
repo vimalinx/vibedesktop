@@ -1,9 +1,8 @@
-/* Interactive simulations for the Star Guide. They act out what the installed
+/* Interactive simulations for the showcase. They act out what the installed
    desktop does, with the same steps, commands, ports and paths; they never
    pretend to touch the visitor's computer. */
-import { copyText, emit, glyph, h, reducedMotion, sleep, tile } from "./util.js";
+import { INSTALL_COMMAND, copyText, emit, glyph, h, reducedMotion, sleep, tile } from "./util.js";
 import { lang, t } from "./i18n.js";
-import { INSTALL_COMMAND } from "./chapters.js";
 
 const L = (zh, en) => (lang === "zh" ? zh : en);
 
@@ -23,7 +22,7 @@ function runner() {
 
 function frame(title, ...children) {
   return h("div", { class: "sim-window" },
-    h("div", { class: "sim-titlebar" }, h("span", { class: "sim-dots", "aria-hidden": "true" }, h("i"), h("i"), h("i")), h("span", { text: title }), h("span", { class: "sim-tag", text: t("tour.sim") })),
+    h("div", { class: "sim-titlebar" }, h("span", { class: "sim-dots", "aria-hidden": "true" }, h("i"), h("i"), h("i")), h("span", { text: title }), h("span", { class: "sim-tag", text: t("show.sim") })),
     h("div", { class: "sim-body" }, children));
 }
 
@@ -460,74 +459,6 @@ function manifestSim() {
   return { node: h("div", { class: "sim sim-manifest" }, h("div", { class: "manifest-grid" }, editor, panel), hint, controls) };
 }
 
-/* ----- 7. Versions and scenes ----- */
-
-function versionsSim(ctx) {
-  const run = runner();
-  const versions = ["v0.2.2", "v0.3.0", "v0.3.1"];
-  let current = 2;
-  let failed = null;
-  const line = h("ol", { class: "version-line" });
-  const log = h("ul", { class: "sim-checks" });
-  const render = () => {
-    line.replaceChildren(...versions.map((name, index) => h("li", { class: `${index === current ? "is-current" : ""}${failed === index ? " is-failed" : ""}` },
-      h("span", { class: "version-dot", "aria-hidden": "true" }), h("span", { text: name }),
-      index === current ? h("small", { text: L("当前", "current") }) : index === current - 1 && failed !== index ? h("small", { text: L("可回滚", "rollback") }) : failed === index ? h("small", { text: L("没通过", "failed") }) : null)));
-  };
-  const update = h("button", { type: "button", class: "button primary sim-action" }, glyph("download"), L("更新（模拟一个坏版本）", "Update (to a simulated bad build)"));
-  const rollback = h("button", { type: "button", class: "button secondary sim-action" }, glyph("refresh"), L("回滚到上一版", "Roll back"));
-  update.addEventListener("click", async () => {
-    const flow = run.start();
-    if (!versions.includes("v0.3.2")) versions.push("v0.3.2");
-    failed = null;
-    const good = versions[current];
-    render();
-    log.replaceChildren();
-    const steps = [
-      [L("拉取 v0.3.2", "Fetch v0.3.2"), "ok"],
-      [L("在独立目录构建（不碰正在用的版本）", "Build in a separate directory (the running version is untouched)"), "ok"],
-      [L("原子切换到 v0.3.2", "Switch to v0.3.2 atomically"), "ok"],
-      [L("健康检查：没有响应 ✗", "Health check: no answer ✗"), "bad"],
-      [L(`自动回到 ${good}，配置和数据没动`, `Back on ${good} automatically; config and data untouched`), "ok"]
-    ];
-    for (const [text, tone] of steps) {
-      if (!(await flow.wait(600))) return;
-      log.append(h("li", { class: `is-${tone}` }, glyph(tone === "bad" ? "close" : "check"), h("span", { text })));
-    }
-    failed = versions.indexOf("v0.3.2");
-    render();
-  });
-  rollback.addEventListener("click", () => {
-    run.stop();
-    if (current === 0) return;
-    current -= 1;
-    render();
-    log.replaceChildren(h("li", { class: "is-ok" }, glyph("check"), h("span", { text: L(`已回到 ${versions[current]}，不需要联网`, `Now on ${versions[current]}, no network needed`) })));
-  });
-  render();
-
-  const sceneList = h("ul", { class: "scene-list" });
-  const renderScenes = () => {
-    const scenes = ctx.scenes.list();
-    sceneList.replaceChildren(...(scenes.length ? scenes.map((scene) => h("li", {},
-      h("button", { type: "button", class: "chip", onClick: () => ctx.scenes.restore(scene.name) }, glyph("layers"), scene.name))) : [h("li", { class: "sim-caption", text: t("scenes.empty") })]));
-  };
-  renderScenes();
-  const off = ctx.on("scene:change", renderScenes);
-  return {
-    node: h("div", { class: "sim sim-versions" },
-      frame("vibedesktop update", line, log, h("div", { class: "sim-controls" }, update, rollback)),
-      h("div", { class: "scene-quick" },
-        h("p", { class: "sim-caption", text: L("场景（真的能用）：先打开几个窗口，再存下来。", "Scenes (these really work): open a few windows, then save them.") }),
-        h("div", { class: "sim-controls" }, h("button", { type: "button", class: "button primary sim-action", onClick: () => ctx.scenes.save() }, glyph("save"), t("command.saveScene"))),
-        sceneList)),
-    unmount() {
-      run.stop();
-      off();
-    }
-  };
-}
-
 /* ----- 8. Security boundary ----- */
 
 function shieldSim() {
@@ -587,4 +518,4 @@ export function installCard() {
     status);
 }
 
-export const SIMS = { storm, import: importSim, market: marketSim, manifest: manifestSim, versions: versionsSim, shield: shieldSim };
+export const SIMS = { storm, import: importSim, market: marketSim, manifest: manifestSim, shield: shieldSim };
