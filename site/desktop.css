@@ -250,6 +250,8 @@ body.vd {
 .vd-snap-ghost { position: absolute; border: 2px solid rgba(200, 255, 61, 0.5); border-radius: 14px; background: rgba(200, 255, 61, 0.08); pointer-events: none; transition: all 0.12s ease; }
 body.is-dragging { cursor: grabbing; user-select: none; }
 body.is-dragging iframe { pointer-events: none; }
+.vd-win-error { display: grid; gap: 10px; padding: 28px; }
+.vd-win-error code { color: var(--vd-bad); }
 .vd-frame { position: absolute; inset: 0; display: block; width: 100%; height: 100%; border: 0; background: #fff; }
 .vd-site-notice {
   position: absolute;

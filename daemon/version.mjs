@@ -12,7 +12,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-export const DAEMON_RELEASE_VERSION = "0.3.2";
+export const DAEMON_RELEASE_VERSION = "0.3.3";
 
 /**
  * @param {string} daemonDir Absolute path to the running `daemon/` directory

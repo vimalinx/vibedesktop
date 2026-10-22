@@ -3,6 +3,16 @@
 All notable user-visible changes are documented here. Vibe Desktop follows
 semantic versioning from the first public 0.2 release onward.
 
+## 0.3.3 - 2026-10-23
+
+The desktop itself is unchanged; this release fixes the website.
+
+### vibedesktop.online
+- Fixed website, browser, market and developer windows opening as an empty strip
+  in the corner (a script error stopped them halfway). A single click opens the
+  site inside the desktop again.
+- A window whose app fails to load now shows the error instead of breaking.
+
 ## 0.3.2 - 2026-10-22
 
 The desktop itself is unchanged; this release publishes the redesigned website

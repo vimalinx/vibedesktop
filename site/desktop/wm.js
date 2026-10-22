@@ -132,15 +132,23 @@ export function openApp(appId, options = {}) {
   const win = { id, appId, el, body, rect, z: 0, minimized: false, maximized: Boolean(options.maximized), snapped: options.snapped || null, ctrl: null };
   wins.set(id, win);
   fitInside(win);
-  win.ctrl = app.mount(body, {
-    win,
-    params: options.params || {},
-    close: () => closeWindow(id),
-    setTitle: (text) => { title.textContent = text; }
-  }) || {};
-  for (const extra of win.ctrl.actions || []) {
-    const node = h("button", { type: "button", class: "vd-win-btn", "aria-label": extra.label, title: extra.label, onClick: extra.run }, glyph(extra.glyph));
-    extra.append(node);
+  try {
+    win.ctrl = app.mount(body, {
+      win,
+      params: options.params || {},
+      close: () => closeWindow(id),
+      setTitle: (text) => { title.textContent = text; }
+    }) || {};
+  } catch (error) {
+    // One broken app must not leave a broken window behind; show what happened instead.
+    console.error(error);
+    win.ctrl = {};
+    body.replaceChildren(h("div", { class: "vd-win-error", role: "alert" },
+      h("strong", { text: t("win.failed") }),
+      h("code", { text: error instanceof Error ? error.message : String(error) })));
+  }
+  for (const action of win.ctrl.actions || []) {
+    extra.append(h("button", { type: "button", class: "vd-win-btn", "aria-label": action.label, title: action.label, onClick: action.run }, glyph(action.glyph)));
   }
   actions.append(button("min", "minimize", t("win.minimize")), button("max", "maximize", t("win.maximize")), button("close", "close", t("win.close")));
   actions.addEventListener("click", (event) => {
